@@ -2,5 +2,7 @@
 ### 星愿令
 简单方便防破解，不一样的密码管理工具
 
+![image](https://raw.githubusercontent.com/lingyicute/StarryPass/master/icon.png)
+
 ### 下载
 从 [Release](https://github.com/lingyicute/StarryPass/releases/latest) 下载
