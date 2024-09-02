@@ -5,4 +5,5 @@
 ![image](https://raw.githubusercontent.com/lingyicute/StarryPassAndroidWeb/master/banner.jpg)
 
 ### 下载
-从 [Release](https://github.com/lingyicute/StarryPassAndroid/releases/latest) 下载
+[Latest release](https://raw.githubusercontent.com/lingyicute/StarryPassAndroid/main/latest.apk)
+
