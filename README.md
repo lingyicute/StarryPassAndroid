@@ -7,7 +7,9 @@
 [![Platform: Android 8.0+](https://img.shields.io/badge/Android-8.0%2B%20(API%2026--35)-3DDC84.svg)](#)
 [![UI: Material You (M3)](https://img.shields.io/badge/UI-Material%20You%20(Monet)-6750A4.svg)](#)
 
----
+
+![image](https://raw.githubusercontent.com/lingyicute/StarryPass/master/banner.jpg)
+
 
 ## 📦 获取
 
