@@ -121,8 +121,8 @@
     <string name="settings_colorize_desc">Distinguish letters, digits, and symbols with Material tonal colors</string>
 
     <string name="settings_biometric_section">Hardware Biometric Vault (Optional)</string>
-    <string name="settings_biometric_enrolled_title">Biometric Unlock Enabled</string>
-    <string name="settings_biometric_enrolled_desc">Encrypted with Android Keystore AES-256-GCM hardware key; every unlock requires biometric verification.</string>
+    <string name="settings_biometric_enrolled_title">Biometric Vault Saved</string>
+    <string name="settings_biometric_enrolled_desc">Each unlock checks that the Keystore key is hardware-backed and requires biometric verification. You may revoke the stored vault below.</string>
     <string name="settings_biometric_not_enrolled_title">Strict Zero-Storage Mode (Default)</string>
     <string name="settings_biometric_not_enrolled_desc">Master password lives only in RAM. Optionally enroll hardware biometric unlock for faster derivation &amp; Autofill.</string>
     <string name="settings_biometric_enroll_btn">Enroll Master Password</string>
@@ -140,7 +140,9 @@
     <string name="biometric_err_empty_master">Please enter a master password first</string>
     <string name="biometric_err_cipher">Hardware keystore cryptographic operation failed</string>
     <string name="biometric_err_not_enrolled">Biometric vault is not enrolled</string>
-    <string name="biometric_err_key_invalidated">System biometrics changed — hardware key invalidated for safety. Please re-enroll.</string>
+    <string name="biometric_err_key_invalidated">System biometrics changed and the key is invalid. Revoke the stored vault before re-enrolling.</string>
+    <string name="biometric_err_hardware_unverified">A hardware-backed Keystore key could not be verified. The existing vault, if any, is kept; you can revoke it in settings.</string>
+    <string name="biometric_err_existing_vault">A vault already exists. Revoke it in settings before enrolling again.</string>
 
     <string name="settings_autofill_section">System Autofill Service</string>
     <string name="settings_autofill_enabled">StarryPass Autofill is Active</string>

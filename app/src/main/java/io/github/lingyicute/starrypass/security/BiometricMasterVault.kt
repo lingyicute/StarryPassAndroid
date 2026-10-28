@@ -13,6 +13,7 @@ package io.github.lingyicute.starrypass.security
 import android.content.Context
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -30,6 +31,7 @@ import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 
 enum class BiometricHardwareStatus {
@@ -52,7 +54,8 @@ class BiometricMasterVault(private val appContext: Context) {
 
     private val prefs = appContext.getSharedPreferences(PREF_FILE, Context.MODE_PRIVATE)
 
-    private val _isEnrolled = MutableStateFlow(hasStoredBlobAndKey())
+    // Keep the revoke control available even if an existing key cannot be inspected or loaded.
+    private val _isEnrolled = MutableStateFlow(hasStoredBlob())
     val isEnrolled: StateFlow<Boolean> = _isEnrolled.asStateFlow()
 
     fun queryHardwareStatus(): BiometricHardwareStatus {
@@ -65,7 +68,7 @@ class BiometricMasterVault(private val appContext: Context) {
     }
 
     fun refreshState() {
-        _isEnrolled.value = hasStoredBlobAndKey()
+        _isEnrolled.value = hasStoredBlob()
     }
 
     /**
@@ -82,8 +85,17 @@ class BiometricMasterVault(private val appContext: Context) {
             onError(activity.getString(R.string.biometric_err_empty_master))
             return
         }
+        if (hasStoredBlob()) {
+            onError(activity.getString(R.string.biometric_err_existing_vault))
+            return
+        }
         try {
             val secretKey = createFreshKeystoreKey()
+            if (!isHardwareBacked(secretKey)) {
+                discardUnenrolledKey()
+                onError(activity.getString(R.string.biometric_err_hardware_unverified))
+                return
+            }
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
 
@@ -105,7 +117,8 @@ class BiometricMasterVault(private val appContext: Context) {
                             onError(activity.getString(R.string.biometric_err_cipher))
                             return
                         }
-                        val plainBytes = masterPassword.toByteArray(Charsets.UTF_8)
+                        // Normalization also preserves TextEncoder-equivalent behavior for malformed UTF-16.
+                        val plainBytes = Spv2Spec.normalizeMasterToUtf8(masterPassword)
                         try {
                             val ct = unlockedCipher.doFinal(plainBytes)
                             val iv = unlockedCipher.iv
@@ -116,7 +129,7 @@ class BiometricMasterVault(private val appContext: Context) {
                             _isEnrolled.value = true
                             onSuccess()
                         } catch (e: Exception) {
-                            clearVault()
+                            discardUnenrolledKey()
                             onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
                         } finally {
                             Spv2Spec.zeroize(plainBytes)
@@ -135,7 +148,7 @@ class BiometricMasterVault(private val appContext: Context) {
             )
             prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (e: Exception) {
-            clearVault()
+            discardUnenrolledKey()
             onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
         }
     }
@@ -151,9 +164,13 @@ class BiometricMasterVault(private val appContext: Context) {
         val ivB64 = prefs.getString(PREF_IV, null)
         val ctB64 = prefs.getString(PREF_CT, null)
         val key = getExistingKeystoreKey()
-        if (ivB64.isNullOrEmpty() || ctB64.isNullOrEmpty() || key == null) {
-            clearVault()
+        if (ivB64.isNullOrEmpty() || ctB64.isNullOrEmpty()) {
             onError(activity.getString(R.string.biometric_err_not_enrolled))
+            return
+        }
+        if (key == null || !isHardwareBacked(key)) {
+            // Preserve the existing ciphertext and key for explicit user revocation.
+            onError(activity.getString(R.string.biometric_err_hardware_unverified))
             return
         }
 
@@ -205,7 +222,6 @@ class BiometricMasterVault(private val appContext: Context) {
             )
             prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: KeyPermanentlyInvalidatedException) {
-            clearVault()
             onError(activity.getString(R.string.biometric_err_key_invalidated))
         } catch (e: Exception) {
             onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
@@ -226,10 +242,29 @@ class BiometricMasterVault(private val appContext: Context) {
         _isEnrolled.value = false
     }
 
-    private fun hasStoredBlobAndKey(): Boolean {
-        val hasPrefs = !prefs.getString(PREF_IV, null).isNullOrEmpty() &&
-            !prefs.getString(PREF_CT, null).isNullOrEmpty()
-        return hasPrefs && getExistingKeystoreKey() != null
+    private fun hasStoredBlob(): Boolean =
+        !prefs.getString(PREF_IV, null).isNullOrEmpty() || !prefs.getString(PREF_CT, null).isNullOrEmpty()
+
+    private fun isHardwareBacked(key: SecretKey): Boolean = try {
+        val factory = SecretKeyFactory.getInstance(key.algorithm, ANDROID_KEYSTORE)
+        val info = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            KeystoreHardwarePolicy.isHardwareBacked(Build.VERSION.SDK_INT, info.securityLevel, null)
+        } else {
+            @Suppress("DEPRECATION")
+            KeystoreHardwarePolicy.isHardwareBacked(Build.VERSION.SDK_INT, null, info.isInsideSecureHardware)
+        }
+    } catch (_: Exception) {
+        // Failure to inspect the key is not evidence of hardware isolation.
+        false
+    }
+
+    private fun discardUnenrolledKey() {
+        if (hasStoredBlob()) return
+        runCatching {
+            val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            if (ks.containsAlias(KEY_ALIAS)) ks.deleteEntry(KEY_ALIAS)
+        }
     }
 
     private fun getExistingKeystoreKey(): SecretKey? = runCatching {
@@ -238,6 +273,7 @@ class BiometricMasterVault(private val appContext: Context) {
     }.getOrNull()
 
     private fun createFreshKeystoreKey(): SecretKey {
+        check(!hasStoredBlob()) { "Existing vault must be revoked explicitly" }
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         if (ks.containsAlias(KEY_ALIAS)) {
             ks.deleteEntry(KEY_ALIAS)
