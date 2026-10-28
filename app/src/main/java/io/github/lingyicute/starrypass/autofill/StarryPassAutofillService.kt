@@ -188,9 +188,14 @@ class StarryPassAutofillService : AutofillService() {
                 for (id in targetIds) {
                     setValue(id, null, MATCH_ALL_PATTERN, dropdownView, inlinePresentation)
                 }
-            } else {
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 for (id in targetIds) {
                     setValue(id, null, MATCH_ALL_PATTERN, dropdownView)
+                }
+            } else {
+                // API 26–27 have no custom-filter overload; use the original API 26 method.
+                for (id in targetIds) {
+                    setValue(id, null, dropdownView)
                 }
             }
         }.build()
