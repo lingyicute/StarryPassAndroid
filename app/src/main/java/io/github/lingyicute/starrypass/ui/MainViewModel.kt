@@ -78,7 +78,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         state = _uiState,
         derive = engine::derive,
-        isSelfTestVerified = { engine.isSelfTestVerified }
+        isSelfTestVerified = { engine.isSelfTestVerified },
+        currentWipeGeneration = { app.sessionWipes.generation.value }
     )
 
     init {
@@ -87,18 +88,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(katVerified = engine.isSelfTestVerified) }
         }
 
-        // Automatically clear in-memory master & output when ProcessLifecycleOwner triggers background wipe
+        // Capture before launching so a wipe between construction and collection is not missed.
+        var observedWipe = app.sessionWipes.generation.value
         viewModelScope.launch {
-            app.sessionWipeEvents.collect {
-                derivation.cancel()
-                _uiState.update { state ->
-                    state.copy(
-                        master = "",
-                        derivedPassword = null,
-                        isDeriving = false,
-                        errorCode = null,
-                        strength = StrengthEstimate(0, 0, StrengthReason.EMPTY)
-                    )
+            app.sessionWipes.generation.collect { generation ->
+                if (generation != observedWipe) {
+                    observedWipe = generation
+                    derivation.cancel()
+                    _uiState.update { state ->
+                        state.copy(
+                            master = "",
+                            derivedPassword = null,
+                            isDeriving = false,
+                            errorCode = null,
+                            strength = StrengthEstimate(0, 0, StrengthReason.EMPTY)
+                        )
+                    }
                 }
             }
         }

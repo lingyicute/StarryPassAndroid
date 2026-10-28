@@ -143,6 +143,7 @@
     <string name="biometric_err_key_invalidated">系统生物识别已变更，密钥已失效。请先手动撤销已保存的保险箱，再重新绑定。</string>
     <string name="biometric_err_hardware_unverified">无法确认 Keystore 密钥受安全硬件保护。已有保险箱会保留，可在设置中手动撤销。</string>
     <string name="biometric_err_existing_vault">已存在保险箱，请先在设置中撤销，再重新绑定。</string>
+    <string name="biometric_err_auth_in_progress">生物识别录入正在进行。</string>
 
     <string name="settings_autofill_section">系统自动填充服务（Autofill）</string>
     <string name="settings_autofill_enabled">星愿令自动填充服务已激活</string>
