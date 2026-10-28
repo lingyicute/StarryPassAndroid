@@ -5,8 +5,12 @@
  */
 package io.github.lingyicute.starrypass.crypto
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -65,6 +69,7 @@ class Spv2Engine(
     private var sessionNonce: ByteArray? = null
     private var cachedTag: ByteArray? = null
     private var cachedSk: ByteArray? = null
+    private var cachedOwner: Any? = null
 
     val isSelfTestVerified: Boolean
         get() = selfTestPassed
@@ -81,74 +86,100 @@ class Spv2Engine(
         }
     }
 
-    suspend fun derive(request: DeriveRequest): DeriveResult = withContext(computeDispatcher) {
-        mutex.withLock {
-            val t0 = System.nanoTime()
-            runSelfTestLocked()
+    suspend fun derive(request: DeriveRequest): DeriveResult {
+        val owner = Any()
+        try {
+            return withContext(computeDispatcher) {
+                mutex.withLock {
+                    currentCoroutineContext().ensureActive()
+                    val t0 = System.nanoTime()
+                    runSelfTestLocked()
+                    currentCoroutineContext().ensureActive()
 
-            val masterBytes = Spv2Spec.normalizeMasterToUtf8(request.master)
-            val codeBytes = Spv2Spec.normalizeCodeToUtf8(request.code)
-            val counter = Spv2Spec.clampCounter(request.counter)
-            val length = Spv2Spec.clampLength(request.length)
-            val tier = request.tier
-            val mode = request.mode
+                    val masterBytes = Spv2Spec.normalizeMasterToUtf8(request.master)
+                    val codeBytes = Spv2Spec.normalizeCodeToUtf8(request.code)
+                    val counter = Spv2Spec.clampCounter(request.counter)
+                    val length = Spv2Spec.clampLength(request.length)
+                    val tier = request.tier
+                    val mode = request.mode
 
-            if (masterBytes.isEmpty() || codeBytes.isEmpty()) {
-                Spv2Spec.zeroize(masterBytes)
-                Spv2Spec.zeroize(codeBytes)
-                throw Spv2Exception(Spv2ErrorCode.EMPTY_INPUT)
-            }
+                    try {
+                        if (masterBytes.isEmpty() || codeBytes.isEmpty()) {
+                            throw Spv2Exception(Spv2ErrorCode.EMPTY_INPUT)
+                        }
+                        val reqTag = computeSessionTagLocked(masterBytes, codeBytes, tier.id)
+                        var tagTransferred = false
+                        try {
+                            val existingTag = cachedTag
+                            val existingSk = cachedSk
+                            val sk: ByteArray
+                            val usedCache: Boolean
 
-            try {
-                val reqTag = computeSessionTagLocked(masterBytes, codeBytes, tier.id)
-                val existingTag = cachedTag
-                val existingSk = cachedSk
+                            if (existingTag != null && existingSk != null &&
+                                Spv2Primitives.constantTimeEquals(reqTag, existingTag)
+                            ) {
+                                currentCoroutineContext().ensureActive()
+                                // A later successful request owns a reused cache entry.
+                                cachedOwner = owner
+                                sk = existingSk
+                                usedCache = true
+                            } else {
+                                val salt = buildSalt(codeBytes, tier.id)
+                                val ad = Spv2Spec.domainAd()
+                                val fresh = try {
+                                    // Bouncy Castle Argon2 is synchronous and cannot be interrupted.
+                                    Spv2Primitives.argon2id(
+                                        password = masterBytes,
+                                        salt = salt,
+                                        ad = ad,
+                                        secret = null,
+                                        memoryKiB = tier.memoryKiB,
+                                        passes = tier.passes,
+                                        parallelism = tier.parallelism,
+                                        tagLength = Spv2Spec.SESSION_KEY_BYTES
+                                    )
+                                } finally {
+                                    Spv2Spec.zeroize(salt)
+                                    Spv2Spec.zeroize(ad)
+                                }
+                                try {
+                                    // Do not publish work that finished after its caller was cancelled.
+                                    currentCoroutineContext().ensureActive()
+                                    clearCachedKeyLocked()
+                                    cachedSk = fresh
+                                    cachedTag = reqTag
+                                    cachedOwner = owner
+                                    tagTransferred = true
+                                    sk = fresh
+                                    usedCache = false
+                                } finally {
+                                    if (!tagTransferred) Spv2Spec.zeroize(fresh)
+                                }
+                            }
 
-                val sk: ByteArray
-                val usedCache: Boolean
-
-                if (existingTag != null && existingSk != null &&
-                    Spv2Primitives.constantTimeEquals(reqTag, existingTag)
-                ) {
-                    sk = existingSk
-                    usedCache = true
-                    Spv2Spec.zeroize(reqTag)
-                } else {
-                    val salt = buildSalt(codeBytes, tier.id)
-                    val ad = Spv2Spec.domainAd()
-                    val fresh = try {
-                        Spv2Primitives.argon2id(
-                            password = masterBytes,
-                            salt = salt,
-                            ad = ad,
-                            secret = null,
-                            memoryKiB = tier.memoryKiB,
-                            passes = tier.passes,
-                            parallelism = tier.parallelism,
-                            tagLength = Spv2Spec.SESSION_KEY_BYTES
-                        )
+                            Spv2Spec.zeroize(masterBytes)
+                            val pwd = synthesizePassword(sk, codeBytes, counter, length, mode)
+                            currentCoroutineContext().ensureActive()
+                            val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
+                            DeriveResult(password = pwd, cached = usedCache, elapsedMs = elapsedMs)
+                        } finally {
+                            if (!tagTransferred) Spv2Spec.zeroize(reqTag)
+                        }
                     } finally {
-                        Spv2Spec.zeroize(salt)
-                        Spv2Spec.zeroize(ad)
+                        Spv2Spec.zeroize(masterBytes)
+                        Spv2Spec.zeroize(codeBytes)
                     }
-                    Spv2Spec.zeroize(cachedTag)
-                    Spv2Spec.zeroize(cachedSk)
-                    cachedSk = fresh
-                    cachedTag = reqTag
-                    sk = fresh
-                    usedCache = false
                 }
-
-                // Zeroize master password bytes immediately before HKDF expansion
-                Spv2Spec.zeroize(masterBytes)
-
-                val pwd = synthesizePassword(sk, codeBytes, counter, length, mode)
-                val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
-                DeriveResult(password = pwd, cached = usedCache, elapsedMs = elapsedMs)
-            } finally {
-                Spv2Spec.zeroize(masterBytes)
-                Spv2Spec.zeroize(codeBytes)
             }
+        } catch (cancelled: CancellationException) {
+            // withContext can discard an already computed result when dispatching back to a
+            // cancelled caller. Only clear this request's cache, not a newer request's entry.
+            withContext(NonCancellable) {
+                mutex.withLock {
+                    if (cachedOwner === owner) clearCachedKeyLocked()
+                }
+            }
+            throw cancelled
         }
     }
 
@@ -157,13 +188,18 @@ class Spv2Engine(
      */
     suspend fun wipeSession() {
         mutex.withLock {
-            Spv2Spec.zeroize(cachedTag)
-            cachedTag = null
-            Spv2Spec.zeroize(cachedSk)
-            cachedSk = null
+            clearCachedKeyLocked()
             Spv2Spec.zeroize(sessionNonce)
             sessionNonce = null
         }
+    }
+
+    private fun clearCachedKeyLocked() {
+        Spv2Spec.zeroize(cachedTag)
+        cachedTag = null
+        Spv2Spec.zeroize(cachedSk)
+        cachedSk = null
+        cachedOwner = null
     }
 
     private fun getOrCreateSessionNonceLocked(): ByteArray {
