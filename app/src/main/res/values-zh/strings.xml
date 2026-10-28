@@ -105,6 +105,9 @@
     <string name="preset_field_package">自动填充匹配包名（选填，如 com.github.android）</string>
     <string name="preset_rotate_plus_one">轮换 +1</string>
     <string name="preset_rotated_toast">已将「%1$s」轮换序号升至 #%2$d</string>
+    <string name="preset_rotation_limit_button">已达上限 9999</string>
+    <string name="preset_rotation_limit_message">轮换序号已达上限 9999，未作更改。</string>
+    <string name="preset_rotation_missing">该预设已不存在。</string>
 
     <!-- Security & Settings Tab -->
     <string name="settings_appearance_section">Material You 与外观</string>

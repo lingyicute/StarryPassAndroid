@@ -131,23 +131,27 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun incrementPresetCounter(presetId: String): SitePreset? {
-        var updated: SitePreset? = null
+    suspend fun incrementPresetCounter(presetId: String): PresetRotationResult {
+        var result: PresetRotationResult = PresetRotationResult.NotFound
         dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
             val idx = current.indexOfFirst { it.id == presetId }
             if (idx >= 0) {
                 val item = current[idx]
-                val next = item.copy(
-                    counter = Spv2Spec.clampCounter(item.counter + 1),
-                    updatedAtEpochMs = System.currentTimeMillis()
-                )
-                current[idx] = next
-                updated = next
-                prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
+                if (item.counter >= Spv2Spec.MAX_COUNTER) {
+                    result = PresetRotationResult.LimitReached
+                } else {
+                    val next = item.copy(
+                        counter = Spv2Spec.clampCounter(item.counter + 1),
+                        updatedAtEpochMs = System.currentTimeMillis()
+                    )
+                    current[idx] = next
+                    result = PresetRotationResult.Updated(next)
+                    prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
+                }
             }
         }
-        return updated
+        return result
     }
 
     suspend fun deletePreset(presetId: String) {

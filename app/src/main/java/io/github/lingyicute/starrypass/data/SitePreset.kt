@@ -41,6 +41,12 @@ data class SitePreset(
         get() = alias.ifBlank { code }
 }
 
+sealed interface PresetRotationResult {
+    data class Updated(val preset: SitePreset) : PresetRotationResult
+    data object LimitReached : PresetRotationResult
+    data object NotFound : PresetRotationResult
+}
+
 enum class ThemePreference(val storageKey: String) {
     SYSTEM("system"),
     LIGHT("light"),
