@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">StarryPass</string>
+    <string name="app_title">StarryPass</string>
+    <string name="app_subtitle">StarryPass v2.1 · Deterministic Password</string>
+    <string name="autofill_service_label">StarryPass Deterministic Autofill</string>
+
+    <!-- Navigation -->
+    <string name="nav_generator">Derive</string>
+    <string name="nav_presets">Presets</string>
+    <string name="nav_security">Security</string>
+
+    <!-- Generator Card -->
+    <string name="gen_card_title">Derive Password</string>
+    <string name="gen_card_subtitle">Same master password, code &amp; policy always derive the identical password</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_apply">Use</string>
+
+    <string name="field_master_label">Master Password</string>
+    <string name="field_master_show">Show master password</string>
+    <string name="field_master_hide">Hide master password</string>
+    <string name="field_biometric_unlock">Unlock with Biometrics</string>
+
+    <string name="field_code_label">Site Code (e.g. github / purpose)</string>
+    <string name="field_code_clear">Clear site code</string>
+    <string name="action_save_as_preset">Save current site policy</string>
+    <string name="preset_saved_toast">Site policy preset saved (no master password stored)</string>
+
+    <!-- Policy Section -->
+    <string name="policy_summary">Site Policy · Rotation / Length / Charset / Tier</string>
+    <string name="policy_summary_short">%1$d chars · %2$s · #%3$d · %4$s</string>
+    <string name="policy_length_label">Length (%1$d chars, range 4–64)</string>
+    <string name="policy_mode_label">Character Set</string>
+    <string name="mode_full">With Symbols</string>
+    <string name="mode_alnum">Alphanumeric</string>
+    <string name="mode_pin">PIN</string>
+
+    <string name="policy_counter_label">Rotation Counter (increment if a site leaks)</string>
+    <string name="counter_dec">Decrement counter</string>
+    <string name="counter_inc">Increment counter</string>
+
+    <string name="policy_tier_label">KDF Hardening Tier (Argon2id v1.3)</string>
+    <string name="tier_standard">Standard · 64 MiB</string>
+    <string name="tier_paranoid">Paranoid · 256 MiB</string>
+    <string name="tier_standard_short">64 MiB</string>
+    <string name="tier_paranoid_short">256 MiB</string>
+
+    <!-- Result Surface -->
+    <string name="result_caption">Derived Output</string>
+    <string name="result_cached_badge">Cached · %1$d ms</string>
+    <string name="result_fresh_badge">Argon2id · %1$d ms</string>
+    <string name="result_length_badge">%1$d chars</string>
+    <string name="result_mask_output">Mask / reveal derived password</string>
+    <string name="placeholder_enter_both">Enter master password and site code</string>
+    <string name="placeholder_complete_both">Complete both master password and site code</string>
+    <string name="placeholder_deriving">Deriving with Argon2id…</string>
+    <string name="error_derive_oom">Insufficient memory for 256 MiB tier on this device</string>
+    <string name="error_derive_generic">Derivation failed, please retry</string>
+
+    <string name="action_copy">Copy Password</string>
+    <string name="action_copied">Copied</string>
+    <string name="clipboard_copied_snackbar">Copied to clipboard (sensitive masked)</string>
+    <string name="clipboard_copy_failed">Copy failed</string>
+    <string name="clipboard_countdown_banner">Clipboard auto-clears in %1$ds</string>
+    <string name="clipboard_clear_now">Wipe Now</string>
+    <string name="clipboard_cleared_toast">Clipboard wiped</string>
+
+    <!-- Strength Labels -->
+    <string name="strength_empty">—</string>
+    <string name="strength_weak_code">Weak · Master contains site code</string>
+    <string name="strength_weak_date">Weak · Avoid pure dates</string>
+    <string name="strength_weak_common">Weak · Common weak password</string>
+    <string name="strength_weak_pin_short">Weak · Master too short</string>
+    <string name="strength_pin_limited">PIN · Relies on terminal rate-limit</string>
+    <string name="strength_weak_short">Weak · Lengthen master (~%1$d bits)</string>
+    <string name="strength_medium">Medium · Use passphrase (~%1$d bits)</string>
+    <string name="strength_strong">Strong · Cluster-resistant (~%1$d bits)</string>
+    <string name="strength_very_strong">Very Strong · Long-term safe (~%1$d bits)</string>
+
+    <!-- Notice & How It Works -->
+    <string name="security_notice">StarryPass v2.1 derives passwords locally via RFC 9106 Argon2id + RFC 5869 HKDF with zero network permissions. Remember your master password — it can never be recovered if forgotten.</string>
+    <string name="how_title">How It Works</string>
+    <string name="how_step1_title">Memorize One Master Passphrase</string>
+    <string name="how_step1_desc">Pick one strong phrase only you know. Avoid public personal info such as birthdays or initials.</string>
+    <string name="how_step2_title">Assign a Code per Site</string>
+    <string name="how_step2_desc">Distinguish accounts with a short site code like github, google, or cmb-card (case-sensitive).</string>
+    <string name="how_step3_title">Derive Deterministically Anywhere</string>
+    <string name="how_step3_desc">The same master + code + policy produces the exact same byte-for-byte password as StarryPass Web v2/v2.1. Increment rotation counter by +1 if any site leaks.</string>
+
+    <!-- Presets Tab -->
+    <string name="presets_title">Site Policy Presets</string>
+    <string name="presets_subtitle">Stores non-sensitive site codes &amp; policies only — never your master password</string>
+    <string name="presets_add">New Preset</string>
+    <string name="presets_empty_title">No Saved Site Presets</string>
+    <string name="presets_empty_desc" formatted="false">Stay 100% stateless, or optionally save site codes, lengths, modes, and rotation counters here for one-tap reuse &amp; Autofill matching.</string>
+    <string name="presets_search_hint">Filter by site code, alias, or domain…</string>
+    <string name="preset_dialog_add_title">Save Site Preset</string>
+    <string name="preset_dialog_edit_title">Edit Site Preset</string>
+    <string name="preset_field_alias">Display Alias (optional)</string>
+    <string name="preset_field_domain">Autofill Web Domain (optional, e.g. github.com)</string>
+    <string name="preset_field_package">Autofill App Package (optional, e.g. com.github.android)</string>
+    <string name="preset_rotate_plus_one">Rotate +1</string>
+    <string name="preset_rotated_toast">Rotated %1$s to #%2$d</string>
+
+    <!-- Security & Settings Tab -->
+    <string name="settings_appearance_section">Material You &amp; Appearance</string>
+    <string name="settings_dynamic_color_title">Dynamic Wallpaper Color (Monet)</string>
+    <string name="settings_dynamic_color_desc">Adapt tonal palette to your Android 12+ wallpaper</string>
+    <string name="settings_theme_title">Theme Mode</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_colorize_title">Syntax-Highlight Password</string>
+    <string name="settings_colorize_desc">Distinguish letters, digits, and symbols with Material tonal colors</string>
+
+    <string name="settings_biometric_section">Hardware Biometric Vault (Optional)</string>
+    <string name="settings_biometric_enrolled_title">Biometric Unlock Enabled</string>
+    <string name="settings_biometric_enrolled_desc">Encrypted with Android Keystore AES-256-GCM hardware key; every unlock requires biometric verification.</string>
+    <string name="settings_biometric_not_enrolled_title">Strict Zero-Storage Mode (Default)</string>
+    <string name="settings_biometric_not_enrolled_desc">Master password lives only in RAM. Optionally enroll hardware biometric unlock for faster derivation &amp; Autofill.</string>
+    <string name="settings_biometric_enroll_btn">Enroll Master Password</string>
+    <string name="settings_biometric_revoke_btn">Revoke &amp; Destroy Key</string>
+    <string name="settings_biometric_unavailable">Biometric Strong hardware is not enrolled or unavailable on this device.</string>
+
+    <string name="biometric_enroll_dialog_title">Enroll Biometric Vault</string>
+    <string name="biometric_enroll_dialog_desc">Your master password will be encrypted using a non-exportable Android Keystore AES-256-GCM key gated by biometric authentication.</string>
+    <string name="biometric_enroll_title">Confirm Biometric Enrollment</string>
+    <string name="biometric_enroll_subtitle">Encrypt master password in Android Keystore</string>
+    <string name="biometric_unlock_title">Unlock StarryPass</string>
+    <string name="biometric_unlock_subtitle">Verify biometrics to decrypt master password</string>
+    <string name="biometric_enrolled_toast">Hardware biometric unlock enabled</string>
+    <string name="biometric_revoked_toast">Keystore key destroyed; back to strict zero-storage</string>
+    <string name="biometric_err_empty_master">Please enter a master password first</string>
+    <string name="biometric_err_cipher">Hardware keystore cryptographic operation failed</string>
+    <string name="biometric_err_not_enrolled">Biometric vault is not enrolled</string>
+    <string name="biometric_err_key_invalidated">System biometrics changed — hardware key invalidated for safety. Please re-enroll.</string>
+
+    <string name="settings_autofill_section">System Autofill Service</string>
+    <string name="settings_autofill_enabled">StarryPass Autofill is Active</string>
+    <string name="settings_autofill_disabled">Enable StarryPass in Android Autofill Settings</string>
+    <string name="settings_autofill_desc">Derive and fill passwords directly inside browsers &amp; apps without touching the clipboard.</string>
+    <string name="settings_autofill_open_btn">Configure Autofill</string>
+
+    <string name="settings_hardening_section">Runtime Hardening</string>
+    <string name="settings_flag_secure_title">Block Screenshots &amp; Recents Preview</string>
+    <string name="settings_flag_secure_desc">Enforces Window FLAG_SECURE against screen capture and task switcher snapshots</string>
+    <string name="settings_wipe_bg_title">Auto-Wipe Session on Background</string>
+    <string name="settings_wipe_bg_desc">Zeroizes session key, HMAC tag, and master input whenever the app leaves foreground</string>
+    <string name="settings_clipboard_clear_title">Auto-Clear Clipboard</string>
+    <string name="clipboard_off">Off</string>
+    <string name="clipboard_seconds">%1$ds</string>
+
+    <string name="settings_audit_section">Cryptographic Verification &amp; Audit</string>
+    <string name="audit_zero_network_title">Kernel-Enforced Offline Isolation</string>
+    <string name="audit_zero_network_desc">Zero INTERNET permission in AndroidManifest.xml — OS-guaranteed offline execution.</string>
+    <string name="audit_kat_verified">Power-On Self-Test: PASSED (RFC 9106 §5.3 + RFC 5869 TC1)</string>
+    <string name="audit_kat_pending">Power-On Self-Test: Initializing…</string>
+    <string name="audit_primitives_desc" formatted="false">Argon2id v1.3 &amp; HKDF-SHA-256 powered by Bouncy Castle 1.86; SHA-256, HMAC-SHA-256 &amp; CSPRNG powered by Android BoringSSL/Conscrypt. 100% bit-compatible with StarryPass v2 / v2.1.</string>
+    <string name="audit_license_footer">StarryPass v2.1 Android · GNU AGPLv3 · Copyright © 2024-2026 lingyicute</string>
+
+    <!-- Autofill UI -->
+    <string name="autofill_prompt_title">StarryPass · Derive Password</string>
+    <string name="autofill_prompt_subtitle_code">Code: %1$s</string>
+    <string name="autofill_prompt_subtitle_generic">Tap to derive &amp; fill deterministically</string>
+    <string name="autofill_sheet_title">Fill with StarryPass</string>
+    <string name="autofill_fill_btn">Derive &amp; Fill</string>
+    <string name="autofill_unlock_and_fill_btn">Unlock &amp; Fill</string>
+    <string name="autofill_copy_only_btn">Copy</string>
+    <string name="autofill_presets_label">Saved Presets</string>
+    <string name="autofill_policy_toggle">Policy Parameters (Tap to expand)</string>
+    <string name="autofill_detected_target">Target: %1$s</string>
+</resources>

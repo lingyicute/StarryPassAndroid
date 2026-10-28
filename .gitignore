@@ -1,0 +1,32 @@
+# Gradle files
+.gradle/
+.kotlin/
+build/
+**/build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Log/OS Files
+*.log
+.DS_Store
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+output.json
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Keystore & local release artifacts (never track signing keys)
+*.jks
+*.keystore
+keystore/
+release/
+
+# Profiling
+*.hprof
