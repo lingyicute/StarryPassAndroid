@@ -5,6 +5,8 @@
  */
 package io.github.lingyicute.starrypass.crypto
 
+import java.nio.CharBuffer
+import java.nio.charset.CodingErrorAction
 import java.text.Normalizer
 import kotlin.math.max
 import kotlin.math.min
@@ -108,14 +110,28 @@ object Spv2Spec {
     fun normalizeMasterToUtf8(master: String): ByteArray {
         // Master password is NEVER trimmed — only NFC-normalised!
         val nfc = Normalizer.normalize(master, Normalizer.Form.NFC)
-        return nfc.toByteArray(Charsets.UTF_8)
+        return encodeLikeTextEncoder(nfc)
     }
 
     fun normalizeCodeToUtf8(code: String): ByteArray {
         // Site code IS trimmed before NFC normalisation.
         val trimmed = ecmaTrim(code)
         val nfc = Normalizer.normalize(trimmed, Normalizer.Form.NFC)
-        return nfc.toByteArray(Charsets.UTF_8)
+        return encodeLikeTextEncoder(nfc)
+    }
+
+    /** ECMAScript TextEncoder replaces each unpaired UTF-16 surrogate with U+FFFD. */
+    private fun encodeLikeTextEncoder(value: String): ByteArray {
+        val encoder = Charsets.UTF_8.newEncoder()
+            .onMalformedInput(CodingErrorAction.REPLACE)
+            .onUnmappableCharacter(CodingErrorAction.REPLACE)
+            .replaceWith(byteArrayOf(0xEF.toByte(), 0xBF.toByte(), 0xBD.toByte()))
+        val encoded = encoder.encode(CharBuffer.wrap(value))
+        return try {
+            ByteArray(encoded.remaining()).also { encoded.get(it) }
+        } finally {
+            if (encoded.hasArray()) encoded.array().fill(0)
+        }
     }
 
     internal fun writeLE32(out: ByteArray, offset: Int, value: Int) {

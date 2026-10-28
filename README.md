@@ -42,7 +42,8 @@
 
 1. **非对称规范化**：
    - `master`（主密码）：**绝不 `trim`**（保留首尾空格），仅做 Unicode `NFC` 归一化并编码为 UTF-8；
-   - `code`（站点代号）：**先按 ECMA-262 空白字符集（含 `\uFEFF`、`\u3000`、`\u00A0`）`trim`**，再做 Unicode `NFC` 归一化，且 **严格区分大小写**。
+   - `code`（站点代号）：**先按 ECMA-262 空白字符集（含 `\uFEFF`、`\u3000`、`\u00A0`）`trim`**，再做 Unicode `NFC` 归一化，且 **严格区分大小写**；
+   - 未配对的 UTF-16 代理项按网页版 `TextEncoder` 替换为 `U+FFFD`。旧版 Android 可能将这类异常输入编码为 `?`；如果曾使用此类输入，请在升级前使用旧版恢复密码并迁移。
 2. **域分离常量（含末尾 NUL `\x00` 字节精确对齐）**：
    - `DOMAIN_SALT` = `"StarryPass-v2:salt\x00"`（19 字节）
    - `DOMAIN_AD` = `"StarryPass-v2:argon2id-ad:v1"`（28 字节，无 `\x00`）
