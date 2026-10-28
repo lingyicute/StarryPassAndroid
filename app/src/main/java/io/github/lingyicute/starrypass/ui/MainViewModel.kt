@@ -9,10 +9,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.lingyicute.starrypass.StarryPassApp
-import io.github.lingyicute.starrypass.crypto.CrackResistanceEstimator
-import io.github.lingyicute.starrypass.crypto.DeriveRequest
 import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
-import io.github.lingyicute.starrypass.crypto.Spv2Exception
 import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.Spv2Tier
@@ -23,8 +20,6 @@ import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.SitePreset
 import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.BiometricHardwareStatus
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -79,8 +74,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
     val uiState: StateFlow<GeneratorUiState> = _uiState.asStateFlow()
 
-    private var deriveJob: Job? = null
-    private var deriveSequence: Long = 0L
+    private val derivation = GeneratorDerivationCoordinator(
+        scope = viewModelScope,
+        state = _uiState,
+        derive = engine::derive,
+        isSelfTestVerified = { engine.isSelfTestVerified }
+    )
 
     init {
         viewModelScope.launch {
@@ -91,8 +90,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Automatically clear in-memory master & output when ProcessLifecycleOwner triggers background wipe
         viewModelScope.launch {
             app.sessionWipeEvents.collect {
-                deriveJob?.cancel()
-                deriveSequence++
+                derivation.cancel()
                 _uiState.update { state ->
                     state.copy(
                         master = "",
@@ -107,23 +105,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onMasterChanged(newMaster: String) {
-        _uiState.update { it.copy(master = newMaster) }
-        scheduleDerive(debounceMs = 280L)
+        derivation.updateInputs(debounceMs = 280L) { it.copy(master = newMaster) }
     }
 
     fun onCodeChanged(newCode: String) {
-        _uiState.update { it.copy(code = newCode) }
-        scheduleDerive(debounceMs = 280L)
+        derivation.updateInputs(debounceMs = 280L) { it.copy(code = newCode) }
     }
 
     fun clearCode() {
-        _uiState.update { it.copy(code = "") }
-        scheduleDerive(debounceMs = 0L)
+        derivation.updateInputs(debounceMs = 0L) { it.copy(code = "") }
     }
 
     fun resetAll() {
-        deriveJob?.cancel()
-        deriveSequence++
+        derivation.cancel()
         _uiState.update {
             it.copy(
                 master = "",
@@ -149,12 +143,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onLengthChanged(newLength: Int, immediate: Boolean = true) {
         val clamped = Spv2Spec.clampLength(newLength)
-        _uiState.update { it.copy(length = clamped) }
-        scheduleDerive(debounceMs = if (immediate) 40L else 280L)
+        derivation.updateInputs(debounceMs = if (immediate) 40L else 280L) { it.copy(length = clamped) }
     }
 
     fun onModeChanged(newMode: Spv2Mode) {
-        _uiState.update { current ->
+        derivation.updateInputs(debounceMs = 0L) { current ->
             val adjustedLen = when {
                 // Mirror upstream UX: selecting PIN while >8 defaults to 6-digit PIN
                 newMode == Spv2Mode.PIN && current.length > 8 -> 6
@@ -164,22 +157,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             current.copy(mode = newMode, length = adjustedLen)
         }
-        scheduleDerive(debounceMs = 0L)
     }
 
     fun onCounterChanged(newCounter: Int) {
         val clamped = Spv2Spec.clampCounter(newCounter)
-        _uiState.update { it.copy(counter = clamped) }
-        scheduleDerive(debounceMs = 0L)
+        derivation.updateInputs(debounceMs = 0L) { it.copy(counter = clamped) }
     }
 
     fun onTierChanged(newTier: Spv2Tier) {
-        _uiState.update { it.copy(tier = newTier) }
-        scheduleDerive(debounceMs = 60L)
+        derivation.updateInputs(debounceMs = 60L) { it.copy(tier = newTier) }
     }
 
     fun applyPreset(preset: SitePreset) {
-        _uiState.update {
+        derivation.updateInputs(debounceMs = 0L) {
             it.copy(
                 code = preset.code,
                 mode = preset.mode,
@@ -188,7 +178,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 tier = preset.tier
             )
         }
-        scheduleDerive(debounceMs = 0L)
     }
 
     fun saveCurrentAsPreset(onSaved: () -> Unit) {
@@ -231,7 +220,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun copyCurrentPassword(label: String): Boolean {
-        val pwd = _uiState.value.derivedPassword ?: return false
+        val state = _uiState.value
+        if (state.isDeriving) return false
+        val pwd = state.derivedPassword ?: return false
         val clearSec = settingsState.value.clipboardAutoClearSeconds
         return clipboardManager.copySensitivePassword(label, pwd, clearSec)
     }
@@ -276,85 +267,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun queryBiometricHardware(): BiometricHardwareStatus = biometricVault.queryHardwareStatus()
 
-    private fun scheduleDerive(debounceMs: Long) {
-        deriveJob?.cancel()
-        val snapshot = _uiState.value
-        val hasMaster = snapshot.master.isNotEmpty()
-        val hasCode = Spv2Spec.ecmaTrim(snapshot.code).isNotEmpty()
-
-        if (!hasMaster || !hasCode) {
-            deriveSequence++
-            _uiState.update {
-                it.copy(
-                    derivedPassword = null,
-                    isDeriving = false,
-                    errorCode = null,
-                    strength = StrengthEstimate(0, 0, StrengthReason.EMPTY)
-                )
-            }
-            return
-        }
-
-        val seq = ++deriveSequence
-        deriveJob = viewModelScope.launch {
-            if (debounceMs > 0L) {
-                delay(debounceMs)
-            }
-            val current = _uiState.value
-            val est = CrackResistanceEstimator.estimate(
-                master = current.master,
-                code = current.code,
-                tier = current.tier,
-                mode = current.mode,
-                length = current.length
-            )
-            _uiState.update { it.copy(isDeriving = true, errorCode = null, strength = est) }
-
-            try {
-                val res = engine.derive(
-                    DeriveRequest(
-                        master = current.master,
-                        code = current.code,
-                        tier = current.tier,
-                        counter = current.counter,
-                        length = current.length,
-                        mode = current.mode
-                    )
-                )
-                if (seq == deriveSequence) {
-                    _uiState.update {
-                        it.copy(
-                            derivedPassword = res.password,
-                            isDeriving = false,
-                            lastCached = res.cached,
-                            lastElapsedMs = res.elapsedMs,
-                            errorCode = null,
-                            strength = est,
-                            katVerified = engine.isSelfTestVerified
-                        )
-                    }
-                }
-            } catch (e: Spv2Exception) {
-                if (seq == deriveSequence) {
-                    _uiState.update {
-                        it.copy(
-                            derivedPassword = null,
-                            isDeriving = false,
-                            errorCode = e.code
-                        )
-                    }
-                }
-            } catch (_: Throwable) {
-                if (seq == deriveSequence) {
-                    _uiState.update {
-                        it.copy(
-                            derivedPassword = null,
-                            isDeriving = false,
-                            errorCode = Spv2ErrorCode.DERIVE_ERROR
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
