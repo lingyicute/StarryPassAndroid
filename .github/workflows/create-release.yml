@@ -1,0 +1,78 @@
+name: Android checks and nightly
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4
+      - name: Install compile SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Test and build
+        run: bash gradlew --no-daemon testDebugUnitTest assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: ignore
+
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-release
+          path: apk
+      - name: Publish nightly
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          notes="auto build · ${GITHUB_SHA:0:7} · ${GITHUB_REF_NAME} · unsigned APK"
+          if gh release view nightly >/dev/null 2>&1; then
+            # Update in place and upload the new APK before moving the tag or
+            # notes so a failed upload never leaves metadata ahead of its asset.
+            gh release upload nightly apk/app-release-unsigned.apk --clobber
+            # --target updates release metadata, not the existing Git tag ref.
+            git tag --force nightly "$GITHUB_SHA"
+            git push --force origin refs/tags/nightly
+            gh release edit nightly --notes "$notes" --target "$GITHUB_SHA"
+          else
+            git tag --force nightly "$GITHUB_SHA"
+            git push --force origin refs/tags/nightly
+            gh release create nightly apk/app-release-unsigned.apk \
+              --title "Nightly Build" --notes "$notes" \
+              --prerelease --target "$GITHUB_SHA"
+          fi

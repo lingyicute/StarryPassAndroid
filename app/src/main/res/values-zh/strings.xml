@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">星愿令</string>
+    <string name="app_title">星愿令</string>
+    <string name="app_subtitle">StarryPass v2.1 · 确定性密码生成器</string>
+    <string name="autofill_service_label">星愿令 · 确定性密码自动填充</string>
+
+    <!-- Navigation -->
+    <string name="nav_generator">生成密码</string>
+    <string name="nav_presets">站点预设</string>
+    <string name="nav_security">安全与设置</string>
+
+    <!-- Generator Card -->
+    <string name="gen_card_title">生成密码</string>
+    <string name="gen_card_subtitle">同一主密码、代号与策略，永远生成同一密码</string>
+    <string name="action_reset">清空</string>
+    <string name="action_clear">清除</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_save">保存</string>
+    <string name="action_delete">删除</string>
+    <string name="action_apply">套用</string>
+
+    <string name="field_master_label">主密码</string>
+    <string name="field_master_show">显示主密码</string>
+    <string name="field_master_hide">隐藏主密码</string>
+    <string name="field_biometric_unlock">生物识别解锁主密码</string>
+
+    <string name="field_code_label">代号（如站点名、用途）</string>
+    <string name="field_code_clear">清空代号</string>
+    <string name="action_save_as_preset">保存当前站点策略</string>
+    <string name="preset_saved_toast">站点策略预设已保存（绝不含主密码）</string>
+
+    <!-- Policy Section -->
+    <string name="policy_summary">站点策略 · 轮换、长度、字符集、强度档</string>
+    <string name="policy_summary_short">%1$d 位 · %2$s · #%3$d · %4$s</string>
+    <string name="policy_length_label">密码长度（%1$d 位，支持 4–64 自定义）</string>
+    <string name="policy_mode_label">字符集</string>
+    <string name="mode_full">含符号</string>
+    <string name="mode_alnum">字母数字</string>
+    <string name="mode_pin">PIN</string>
+
+    <string name="policy_counter_label">轮换序号（单站泄露时递增即可换密）</string>
+    <string name="counter_dec">序号减一</string>
+    <string name="counter_inc">序号加一</string>
+
+    <string name="policy_tier_label">抗破解档位（Argon2id v1.3）</string>
+    <string name="tier_standard">标准 · 64 MiB</string>
+    <string name="tier_paranoid">极高 · 256 MiB</string>
+    <string name="tier_standard_short">64 MiB</string>
+    <string name="tier_paranoid_short">256 MiB</string>
+
+    <!-- Result Surface -->
+    <string name="result_caption">生成结果</string>
+    <string name="result_cached_badge">命中缓存 · %1$d ms</string>
+    <string name="result_fresh_badge">Argon2id · %1$d ms</string>
+    <string name="result_length_badge">%1$d 位</string>
+    <string name="result_mask_output">遮罩或显示生成结果</string>
+    <string name="placeholder_enter_both">请输入主密码和代号</string>
+    <string name="placeholder_complete_both">请填写完整的主密码和代号</string>
+    <string name="placeholder_deriving">正在通过 Argon2id 硬化派生…</string>
+    <string name="error_derive_oom">当前设备可用内存不足以分配 256 MiB 矩阵，请切换标准档</string>
+    <string name="error_derive_generic">派生失败，请重试</string>
+
+    <string name="action_copy">复制密码</string>
+    <string name="action_copied">已复制</string>
+    <string name="clipboard_copied_snackbar">密码已复制到剪贴板（已启用敏感内容遮罩）</string>
+    <string name="clipboard_copy_failed">复制失败，请重试</string>
+    <string name="clipboard_countdown_banner">剪贴板将在 %1$d 秒后自动清空</string>
+    <string name="clipboard_clear_now">立即清空</string>
+    <string name="clipboard_cleared_toast">剪贴板已安全清空</string>
+
+    <!-- Strength Labels -->
+    <string name="strength_empty">—</string>
+    <string name="strength_weak_code">弱 · 主密码勿含代号</string>
+    <string name="strength_weak_date">弱 · 勿用纯日期</string>
+    <string name="strength_weak_common">弱 · 含常见弱口令</string>
+    <string name="strength_weak_pin_short">弱 · 主密码过短</string>
+    <string name="strength_pin_limited">PIN · 依赖终端限次</string>
+    <string name="strength_weak_short">弱 · 建议加长主密码（约 %1$d bits）</string>
+    <string name="strength_medium">中 · 建议用长句口令（约 %1$d bits）</string>
+    <string name="strength_strong">强 · 抗集群暴力破解（约 %1$d bits）</string>
+    <string name="strength_very_strong">极强 · 长期防破解（约 %1$d bits）</string>
+
+    <!-- Notice & How It Works -->
+    <string name="security_notice">v2.1 使用 Argon2id（RFC 9106）内存硬化派生与 HKDF-SHA-256，本应用零网络权限、全程离线计算，不上传任何数据。请牢记主密码；忘记后无法找回。</string>
+    <string name="how_title">如何使用</string>
+    <string name="how_step1_title">设置专属主密码</string>
+    <string name="how_step1_desc">只记这一个，例如一句话或一段只有你知道的内容。尽量不要包含自己的公开个人信息，如生日、姓名缩写等。</string>
+    <string name="how_step2_title">为每个网站取一个代号</string>
+    <string name="how_step2_desc">用代号区分不同账号，例如 github、google、cmb-card 等（区分大小写）。</string>
+    <string name="how_step3_title">跨平台逐字节一致派生</string>
+    <string name="how_step3_desc">相同的「主密码 + 代号 + 策略」与网页版 StarryPass v2 / v2.1 逐字节完全一致。某站泄露时只需把轮换序号加一。</string>
+
+    <!-- Presets Tab -->
+    <string name="presets_title">站点策略预设</string>
+    <string name="presets_subtitle">仅保存在本地的非敏感代号与策略参数，绝不保存主密码</string>
+    <string name="presets_add">新建预设</string>
+    <string name="presets_empty_title">暂无保存的站点预设</string>
+    <string name="presets_empty_desc" formatted="false">你可以保持 100% 纯无状态使用，也可以在此保存常用代号、长度、字符集与轮换序号，方便一键套用及系统自动填充匹配。</string>
+    <string name="presets_search_hint">搜索代号、别名或域名…</string>
+    <string name="preset_dialog_add_title">保存站点策略预设</string>
+    <string name="preset_dialog_edit_title">编辑站点策略预设</string>
+    <string name="preset_field_alias">显示别名（选填，如 GitHub 主号）</string>
+    <string name="preset_field_domain">自动填充匹配域名（选填，如 github.com）</string>
+    <string name="preset_field_package">自动填充匹配包名（选填，如 com.github.android）</string>
+    <string name="preset_rotate_plus_one">轮换 +1</string>
+    <string name="preset_rotated_toast">已将「%1$s」轮换序号升至 #%2$d</string>
+
+    <!-- Security & Settings Tab -->
+    <string name="settings_appearance_section">Material You 与外观</string>
+    <string name="settings_dynamic_color_title">动态壁纸取色（Monet）</string>
+    <string name="settings_dynamic_color_desc">在 Android 12+ 设备上自动提取系统壁纸色彩生成主题</string>
+    <string name="settings_theme_title">深浅色模式</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="settings_colorize_title">密码字符分色高亮</string>
+    <string name="settings_colorize_desc">以主题色区分字母、数字与特殊符号，便于肉眼核对</string>
+
+    <string name="settings_biometric_section">硬件生物识别保险箱（可选）</string>
+    <string name="settings_biometric_enrolled_title">已启用生物识别快捷解锁</string>
+    <string name="settings_biometric_enrolled_desc">主密码由 Android Keystore 硬件隔离 AES-256-GCM 密钥加密保护，每次读取均须通过强生物识别（指纹或 3D 面容）授权。</string>
+    <string name="settings_biometric_not_enrolled_title">严格零存储模式（默认）</string>
+    <string name="settings_biometric_not_enrolled_desc">主密码仅驻留运行内存。你也可以可选开启硬件生物识别加密托管，加速日常派生与系统自动填充。</string>
+    <string name="settings_biometric_enroll_btn">录入主密码并绑定生物识别</string>
+    <string name="settings_biometric_revoke_btn">撤销并销毁硬件密钥</string>
+    <string name="settings_biometric_unavailable">当前设备未录入强生物识别（指纹或 3D 面容），或硬件不支持。</string>
+
+    <string name="biometric_enroll_dialog_title">启用硬件生物识别托管</string>
+    <string name="biometric_enroll_dialog_desc">主密码将由不可导出的 Android Keystore 硬件密钥（AES-256-GCM）加密存储；新增系统生物识别特征将自动使密钥失效以防越权。</string>
+    <string name="biometric_enroll_title">验证生物识别以加密主密码</string>
+    <string name="biometric_enroll_subtitle">使用 Android Keystore 硬件密钥加密保存</string>
+    <string name="biometric_unlock_title">解锁星愿令</string>
+    <string name="biometric_unlock_subtitle">验证生物识别以解密主密码</string>
+    <string name="biometric_enrolled_toast">硬件生物识别解锁已启用</string>
+    <string name="biometric_revoked_toast">硬件密钥已销毁，已恢复严格零存储模式</string>
+    <string name="biometric_err_empty_master">请先输入主密码</string>
+    <string name="biometric_err_cipher">硬件密钥库加解密操作失败</string>
+    <string name="biometric_err_not_enrolled">尚未配置生物识别托管</string>
+    <string name="biometric_err_key_invalidated">检测到系统生物识别变更，硬件密钥已自动失效保护，请重新绑定。</string>
+
+    <string name="settings_autofill_section">系统自动填充服务（Autofill）</string>
+    <string name="settings_autofill_enabled">星愿令自动填充服务已激活</string>
+    <string name="settings_autofill_disabled">前往系统设置启用星愿令自动填充</string>
+    <string name="settings_autofill_desc">在浏览器与第三方 App 登录框直接派生并填入密码，无需经过系统剪贴板。</string>
+    <string name="settings_autofill_open_btn">配置自动填充服务</string>
+
+    <string name="settings_hardening_section">运行时安全加固</string>
+    <string name="settings_flag_secure_title">禁止截屏与后台预览模糊</string>
+    <string name="settings_flag_secure_desc">启用 Window FLAG_SECURE，防止恶意录屏及多任务卡片泄露密码</string>
+    <string name="settings_wipe_bg_title">切入后台自动抹除内存</string>
+    <string name="settings_wipe_bg_desc">离开前台时立即清零会话密钥、HMAC 标签与已输入的主密码</string>
+    <string name="settings_clipboard_clear_title">剪贴板定时自动清空</string>
+    <string name="clipboard_off">关闭</string>
+    <string name="clipboard_seconds">%1$d 秒</string>
+
+    <string name="settings_audit_section">密码学自检与合规审计</string>
+    <string name="audit_zero_network_title">内核级零网络权限隔离</string>
+    <string name="audit_zero_network_desc">AndroidManifest 未声明 INTERNET 权限，由系统内核强制保证绝不联网。</string>
+    <string name="audit_kat_verified">开机密码学自检：已通过（RFC 9106 §5.3 + RFC 5869 TC1）</string>
+    <string name="audit_kat_pending">开机密码学自检：正在校验…</string>
+    <string name="audit_primitives_desc">Argon2id v1.3 与 HKDF-SHA-256 由经审计的 Bouncy Castle 1.86 提供；SHA-256、HMAC-SHA-256 与真随机数由 Android 系统 BoringSSL / Conscrypt 提供。与网页版 StarryPass v2 / v2.1 逐位兼容。</string>
+    <string name="audit_license_footer">星愿令 · StarryPass v2.1 Android · GNU AGPLv3 · Copyright © 2024-2026 lingyicute</string>
+
+    <!-- Autofill UI -->
+    <string name="autofill_prompt_title">星愿令 · 派生填充密码</string>
+    <string name="autofill_prompt_subtitle_code">代号：%1$s</string>
+    <string name="autofill_prompt_subtitle_generic">点击现场确定性派生并填入</string>
+    <string name="autofill_sheet_title">使用星愿令填充密码</string>
+    <string name="autofill_fill_btn">派生并填充</string>
+    <string name="autofill_unlock_and_fill_btn">生物识别派生并填充</string>
+    <string name="autofill_copy_only_btn">仅复制</string>
+    <string name="autofill_presets_label">快捷套用站点预设</string>
+    <string name="autofill_policy_toggle">派生策略参数（点击展开或收起）</string>
+    <string name="autofill_detected_target">当前目标：%1$s</string>
+</resources>

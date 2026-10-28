@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Explicit paired colors for Autofill RemoteViews in Dark Mode -->
+    <color name="autofill_card_bg">#1E232D</color>
+    <color name="autofill_card_stroke">#353E4F</color>
+    <color name="autofill_title_color">#E4E7EE</color>
+    <color name="autofill_subtitle_color">#B5BDCB</color>
+</resources>

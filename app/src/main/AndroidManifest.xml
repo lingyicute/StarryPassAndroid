@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        INTENTIONALLY ZERO NETWORK PERMISSIONS (No android.permission.INTERNET).
+        Linux kernel (AID_INET) guarantees StarryPass can never transmit data off-device.
+    -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!--
+        android:largeHeap="true" ensures >=512 MiB ART heap headroom so the
+        "paranoid" tier (256 MiB Argon2id v1.3 memory matrix) runs reliably on mobile devices.
+    -->
+    <application
+        android:name=".StarryPassApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:largeHeap="true"
+        android:localeConfig="@xml/locales_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.StarryPass">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            IMPORTANT: AutofillAuthActivity MUST use standard launchMode (never singleInstance/singleTask)
+            and MUST NOT set noHistory="true", because Android AutofillManager invokes it via
+            startIntentSenderForResult inside the client app's task and expects setResult(RESULT_OK, data).
+        -->
+        <activity
+            android:name=".autofill.AutofillAuthActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.StarryPass.Translucent"
+            android:windowSoftInputMode="adjustResize" />
+
+        <service
+            android:name=".autofill.StarryPassAutofillService"
+            android:exported="true"
+            android:label="@string/autofill_service_label"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service_configuration" />
+        </service>
+
+    </application>
+
+</manifest>
