@@ -41,6 +41,32 @@ class CrackResistanceEstimatorTest {
     }
 
     @Test
+    fun `weak roots and suffix boundaries match upstream web estimator`() {
+        // Expected values sampled from the upstream estimator at 8d5dd930.
+        for (master in listOf(
+            "password2026!", "p@ssw0rd99#", "abc123!", "football2026!",
+            "secret", "admintelecom", "Passw0rd2026!", "secret12345678"
+        )) {
+            val estimate = CrackResistanceEstimator.estimate(
+                master, "example", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+            )
+            assertEquals(master, StrengthReason.WEAK_COMMON_ROOT, estimate.reason)
+            assertEquals(master, 18, estimate.bits)
+        }
+        val longSuffix = CrackResistanceEstimator.estimate(
+            "secret123456789", "example", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+        )
+        assertEquals(StrengthReason.WEAK_SHORT, longSuffix.reason)
+        assertEquals(42, longSuffix.bits)
+
+        val notAWeakRoot = CrackResistanceEstimator.estimate(
+            "constructor", "example", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+        )
+        assertEquals(StrengthReason.WEAK_SHORT, notAWeakRoot.reason)
+        assertEquals(35, notAWeakRoot.bits)
+    }
+
+    @Test
     fun `scores passphrases CJK emoji and PIN caps accurately`() {
         val strongChinese = CrackResistanceEstimator.estimate(
             "星垂平野阔，月涌大江流！2026", "github", Spv2Tier.STANDARD, Spv2Mode.FULL, 20
