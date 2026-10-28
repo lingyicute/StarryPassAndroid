@@ -195,7 +195,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val trimmedCode = Spv2Spec.ecmaTrim(s.code)
         if (trimmedCode.isEmpty()) return
         viewModelScope.launch {
-            prefsRepo.upsertPreset(
+            prefsRepo.savePresetPolicy(
                 SitePreset(
                     code = trimmedCode,
                     modeKey = s.mode.key,

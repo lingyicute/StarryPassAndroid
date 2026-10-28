@@ -24,7 +24,9 @@ private val Context.starryPassDataStore: DataStore<Preferences> by preferencesDa
     name = "starrypass_preferences"
 )
 
-class PreferencesRepository(private val context: Context) {
+class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
+
+    constructor(context: Context) : this(context.starryPassDataStore)
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -41,7 +43,7 @@ class PreferencesRepository(private val context: Context) {
         val SITE_PRESETS_JSON = stringPreferencesKey("site_presets_json")
     }
 
-    val settingsFlow: Flow<AppSettings> = context.starryPassDataStore.data.map { prefs ->
+    val settingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
         AppSettings(
             theme = ThemePreference.fromKey(prefs[Keys.THEME]),
             dynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true,
@@ -52,7 +54,7 @@ class PreferencesRepository(private val context: Context) {
         )
     }
 
-    val presetsFlow: Flow<List<SitePreset>> = context.starryPassDataStore.data.map { prefs ->
+    val presetsFlow: Flow<List<SitePreset>> = dataStore.data.map { prefs ->
         val raw = prefs[Keys.SITE_PRESETS_JSON]
         if (raw.isNullOrBlank()) {
             emptyList()
@@ -64,30 +66,36 @@ class PreferencesRepository(private val context: Context) {
     }
 
     suspend fun setTheme(theme: ThemePreference) {
-        context.starryPassDataStore.edit { it[Keys.THEME] = theme.storageKey }
+        dataStore.edit { it[Keys.THEME] = theme.storageKey }
     }
 
     suspend fun setDynamicColor(enabled: Boolean) {
-        context.starryPassDataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
+        dataStore.edit { it[Keys.DYNAMIC_COLOR] = enabled }
     }
 
     suspend fun setFlagSecure(enabled: Boolean) {
-        context.starryPassDataStore.edit { it[Keys.FLAG_SECURE] = enabled }
+        dataStore.edit { it[Keys.FLAG_SECURE] = enabled }
     }
 
     suspend fun setWipeOnBackground(enabled: Boolean) {
-        context.starryPassDataStore.edit { it[Keys.WIPE_ON_BACKGROUND] = enabled }
+        dataStore.edit { it[Keys.WIPE_ON_BACKGROUND] = enabled }
     }
 
     suspend fun setClipboardAutoClearSeconds(seconds: Int) {
-        context.starryPassDataStore.edit { it[Keys.CLIPBOARD_AUTO_CLEAR_SEC] = seconds.coerceAtLeast(0) }
+        dataStore.edit { it[Keys.CLIPBOARD_AUTO_CLEAR_SEC] = seconds.coerceAtLeast(0) }
     }
 
     suspend fun setColorizePassword(enabled: Boolean) {
-        context.starryPassDataStore.edit { it[Keys.COLORIZE_PASSWORD] = enabled }
+        dataStore.edit { it[Keys.COLORIZE_PASSWORD] = enabled }
     }
 
-    suspend fun upsertPreset(preset: SitePreset) {
+    /** Full editor save: explicitly blank metadata must remain clearable. */
+    suspend fun upsertPreset(preset: SitePreset) = savePreset(preset, policyOnly = false)
+
+    /** Quick save: retain metadata from the current stored entry, not a stale UI snapshot. */
+    suspend fun savePresetPolicy(preset: SitePreset) = savePreset(preset, policyOnly = true)
+
+    private suspend fun savePreset(preset: SitePreset, policyOnly: Boolean) {
         val cleanCode = Spv2Spec.ecmaTrim(preset.code)
         if (cleanCode.isEmpty()) return
         val normalized = preset.copy(
@@ -99,13 +107,23 @@ class PreferencesRepository(private val context: Context) {
             autofillPackage = preset.autofillPackage.trim(),
             updatedAtEpochMs = System.currentTimeMillis()
         )
-        context.starryPassDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
             val idx = current.indexOfFirst {
                 it.id == normalized.id || it.code == normalized.code
             }
             if (idx >= 0) {
-                current[idx] = normalized.copy(id = current[idx].id)
+                current[idx] = if (policyOnly) {
+                    current[idx].copy(
+                        modeKey = normalized.modeKey,
+                        length = normalized.length,
+                        counter = normalized.counter,
+                        tierKey = normalized.tierKey,
+                        updatedAtEpochMs = normalized.updatedAtEpochMs
+                    )
+                } else {
+                    normalized.copy(id = current[idx].id)
+                }
             } else {
                 current.add(0, normalized)
             }
@@ -115,7 +133,7 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun incrementPresetCounter(presetId: String): SitePreset? {
         var updated: SitePreset? = null
-        context.starryPassDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
             val idx = current.indexOfFirst { it.id == presetId }
             if (idx >= 0) {
@@ -133,7 +151,7 @@ class PreferencesRepository(private val context: Context) {
     }
 
     suspend fun deletePreset(presetId: String) {
-        context.starryPassDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON])
                 .filterNot { it.id == presetId }
             prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
@@ -141,7 +159,7 @@ class PreferencesRepository(private val context: Context) {
     }
 
     suspend fun clearAllPresets() {
-        context.starryPassDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs.remove(Keys.SITE_PRESETS_JSON)
         }
     }
