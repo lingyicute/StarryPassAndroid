@@ -737,7 +737,7 @@ fun GeneratorScreen(
                                         justCopied = true
                                         onCopyClick()
                                     },
-                                    enabled = pwd != null,
+                                    enabled = pwd != null && !uiState.isDeriving,
                                     shape = CircleShape,
                                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                                     colors = ButtonDefaults.buttonColors(
