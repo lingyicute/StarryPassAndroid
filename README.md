@@ -84,6 +84,7 @@
   - 用户可保持 100% 纯无状态使用，也可将常用的「代号 + 别名 + 长度 + 字符集 + 轮换序号 + 档位 + 匹配域名或包名」保存为本地预设（结构上不包含主密码字段），支持某站泄露时 **一键轮换 `+1`**。
 - **可选 Android Keystore 硬件生物识别保险箱**：
   - 默认关闭（严格零存储）；开启后使用 `AndroidKeyStore` 硬件不可导出 `AES-256-GCM` 密钥加密主密码，`setInvalidatedByBiometricEnrollment(true)` 防止新录入生物识别特征越权；
+  - 启用和每次解锁前均检查 `KeyInfo`：Android 12 及以上要求 TEE 或 StrongBox，旧版本要求密钥位于安全硬件中。软件密钥、未知级别或无法验证时不会启用或解锁；已有保险箱不会因此自动删除，可在设置中手动撤销；
   - 基于 `BiometricPrompt` + `BIOMETRIC_STRONG` + `CryptoObject`，原生支持所有 **指纹识别** 以及通过 Google Android CDD Class 3 安全认证的 **3D 面部识别 / 虹膜识别**（注：普通前置单摄 2D 人脸属于 Class 2 弱生物识别，Android 硬件 Keystore 底层禁止其解锁加密密钥 `CryptoObject`，以确保真硬件级密码学隔离）。
 - **系统级自动填充服务（Android Autofill Service + 键盘内联建议）**：
   - 支持在浏览器（自动提取 `webDomain`）与第三方 App（自动提取包名并匹配站点预设）密码框直接唤起悬浮 Material You 面板，可在面板内自由切换预设或调整策略参数，配合生物识别一键完成现场 Argon2id 派生并填入目标输入框，全程不经过系统剪贴板。

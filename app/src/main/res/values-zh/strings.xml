@@ -121,8 +121,8 @@
     <string name="settings_colorize_desc">以主题色区分字母、数字与特殊符号，便于肉眼核对</string>
 
     <string name="settings_biometric_section">硬件生物识别保险箱（可选）</string>
-    <string name="settings_biometric_enrolled_title">已启用生物识别快捷解锁</string>
-    <string name="settings_biometric_enrolled_desc">主密码由 Android Keystore 硬件隔离 AES-256-GCM 密钥加密保护，每次读取均须通过强生物识别（指纹或 3D 面容）授权。</string>
+    <string name="settings_biometric_enrolled_title">已保存生物识别保险箱</string>
+    <string name="settings_biometric_enrolled_desc">每次解锁均会验证 Keystore 密钥是否受安全硬件保护，并要求强生物识别授权。可在下方手动撤销已保存的保险箱。</string>
     <string name="settings_biometric_not_enrolled_title">严格零存储模式（默认）</string>
     <string name="settings_biometric_not_enrolled_desc">主密码仅驻留运行内存。你也可以可选开启硬件生物识别加密托管，加速日常派生与系统自动填充。</string>
     <string name="settings_biometric_enroll_btn">录入主密码并绑定生物识别</string>
@@ -140,7 +140,9 @@
     <string name="biometric_err_empty_master">请先输入主密码</string>
     <string name="biometric_err_cipher">硬件密钥库加解密操作失败</string>
     <string name="biometric_err_not_enrolled">尚未配置生物识别托管</string>
-    <string name="biometric_err_key_invalidated">检测到系统生物识别变更，硬件密钥已自动失效保护，请重新绑定。</string>
+    <string name="biometric_err_key_invalidated">系统生物识别已变更，密钥已失效。请先手动撤销已保存的保险箱，再重新绑定。</string>
+    <string name="biometric_err_hardware_unverified">无法确认 Keystore 密钥受安全硬件保护。已有保险箱会保留，可在设置中手动撤销。</string>
+    <string name="biometric_err_existing_vault">已存在保险箱，请先在设置中撤销，再重新绑定。</string>
 
     <string name="settings_autofill_section">系统自动填充服务（Autofill）</string>
     <string name="settings_autofill_enabled">星愿令自动填充服务已激活</string>
