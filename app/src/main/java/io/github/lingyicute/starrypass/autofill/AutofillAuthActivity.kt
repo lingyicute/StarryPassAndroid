@@ -83,6 +83,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -115,6 +116,8 @@ import io.github.lingyicute.starrypass.data.AppSettings
 import io.github.lingyicute.starrypass.ui.modeLabelText
 import io.github.lingyicute.starrypass.ui.theme.StarryPassTheme
 import io.github.lingyicute.starrypass.ui.tierShortLabelText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -192,7 +195,8 @@ class AutofillAuthActivity : FragmentActivity() {
 
             BackHandler { cancelAutofill() }
 
-            var master by rememberSaveable { mutableStateOf("") }
+            // Never persist the master password in saved instance state.
+            var master by remember { mutableStateOf("") }
             var code by rememberSaveable { mutableStateOf(initialCode) }
             var mode by rememberSaveable { mutableStateOf(initialMode) }
             var length by rememberSaveable { mutableIntStateOf(initialLength) }
@@ -203,25 +207,37 @@ class AutofillAuthActivity : FragmentActivity() {
             var showMaster by rememberSaveable { mutableStateOf(false) }
             var busy by remember { mutableStateOf(false) }
             var errorMsg by remember { mutableStateOf<String?>(null) }
+            var deriveJob by remember { mutableStateOf<Job?>(null) }
+            var observedWipe by remember { mutableStateOf(app.sessionWipes.generation.value) }
+
+            LaunchedEffect(app) {
+                app.sessionWipes.generation.collect { generation ->
+                    if (generation != observedWipe) {
+                        observedWipe = generation
+                        deriveJob?.cancel()
+                        deriveJob = null
+                        master = ""
+                        showMaster = false
+                        busy = false
+                        errorMsg = null
+                    }
+                }
+            }
 
             fun executeDerive(secretMaster: String, copyOnly: Boolean) {
                 val cleanCode = Spv2Spec.ecmaTrim(code)
                 if (secretMaster.isEmpty() || cleanCode.isEmpty()) return
+                val generation = app.sessionWipes.generation.value
+                val request = DeriveRequest(secretMaster, cleanCode, tier, counter, length, mode)
                 busy = true
                 errorMsg = null
-                scope.launch {
+                deriveJob?.cancel()
+                deriveJob = scope.launch {
                     try {
-                        val res = app.engine.derive(
-                            DeriveRequest(
-                                master = secretMaster,
-                                code = cleanCode,
-                                tier = tier,
-                                counter = counter,
-                                length = length,
-                                mode = mode
-                            )
-                        )
+                        val res = app.engine.derive(request)
                         app.engine.wipeSession()
+                        // A wipe may be signalled before the Compose collector gets CPU time.
+                        if (!app.sessionWipes.isCurrent(generation)) return@launch
                         if (copyOnly) {
                             app.clipboardManager.copySensitivePassword(
                                 label = getString(R.string.app_name),
@@ -232,9 +248,13 @@ class AutofillAuthActivity : FragmentActivity() {
                         } else {
                             completeAutofill(targetIds, cleanCode, res.password)
                         }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (e: Throwable) {
-                        busy = false
-                        errorMsg = e.localizedMessage ?: getString(R.string.error_derive_generic)
+                        if (app.sessionWipes.isCurrent(generation)) {
+                            busy = false
+                            errorMsg = e.localizedMessage ?: getString(R.string.error_derive_generic)
+                        }
                     }
                 }
             }

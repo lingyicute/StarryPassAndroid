@@ -27,7 +27,8 @@ internal class GeneratorDerivationCoordinator(
     private val scope: CoroutineScope,
     private val state: MutableStateFlow<GeneratorUiState>,
     private val derive: suspend (DeriveRequest) -> DeriveResult,
-    private val isSelfTestVerified: () -> Boolean
+    private val isSelfTestVerified: () -> Boolean,
+    private val currentWipeGeneration: () -> Long = { 0L }
 ) {
     private var job: Job? = null
     private var sequence = 0L
@@ -41,6 +42,7 @@ internal class GeneratorDerivationCoordinator(
     fun updateInputs(debounceMs: Long, change: (GeneratorUiState) -> GeneratorUiState) {
         cancel()
         val seq = sequence
+        val wipeGeneration = currentWipeGeneration()
         // Change the inputs and invalidate the previous output in one state update.
         val snapshot = state.updateAndGet { previous ->
             val next = change(previous)
@@ -67,7 +69,7 @@ internal class GeneratorDerivationCoordinator(
                         mode = snapshot.mode
                     )
                 )
-                if (seq == sequence) {
+                if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
                     state.update {
                         it.copy(
                             derivedPassword = result.password,
@@ -82,11 +84,11 @@ internal class GeneratorDerivationCoordinator(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Spv2Exception) {
-                if (seq == sequence) {
+                if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
                     state.update { it.copy(derivedPassword = null, isDeriving = false, errorCode = e.code) }
                 }
             } catch (_: Throwable) {
-                if (seq == sequence) {
+                if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
                     state.update {
                         it.copy(derivedPassword = null, isDeriving = false, errorCode = Spv2ErrorCode.DERIVE_ERROR)
                     }

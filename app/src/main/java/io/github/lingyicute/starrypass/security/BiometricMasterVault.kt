@@ -40,7 +40,10 @@ enum class BiometricHardwareStatus {
     NO_HARDWARE
 }
 
-class BiometricMasterVault(private val appContext: Context) {
+class BiometricMasterVault(
+    private val appContext: Context,
+    private val sessionWipes: SessionWipeSignal
+) {
 
     companion object {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -57,6 +60,19 @@ class BiometricMasterVault(private val appContext: Context) {
     // Keep the revoke control available even if an existing key cannot be inspected or loaded.
     private val _isEnrolled = MutableStateFlow(hasStoredBlob())
     val isEnrolled: StateFlow<Boolean> = _isEnrolled.asStateFlow()
+
+    // BiometricPrompt callbacks and this map are confined to the main thread.
+    private val activePrompts = mutableMapOf<BiometricPrompt, () -> Unit>()
+    private var enrollmentOwner: Any? = null
+
+    fun cancelPendingAuthentication() {
+        val pending = activePrompts.toMap()
+        activePrompts.clear()
+        pending.forEach { (prompt, clear) ->
+            runCatching { clear() }
+            runCatching { prompt.cancelAuthentication() }
+        }
+    }
 
     fun queryHardwareStatus(): BiometricHardwareStatus {
         val bm = BiometricManager.from(appContext)
@@ -89,10 +105,28 @@ class BiometricMasterVault(private val appContext: Context) {
             onError(activity.getString(R.string.biometric_err_existing_vault))
             return
         }
+        if (enrollmentOwner != null) {
+            onError(activity.getString(R.string.biometric_err_auth_in_progress))
+            return
+        }
+
+        val owner = Any()
+        enrollmentOwner = owner
+        val generation = sessionWipes.generation.value
+        var pendingMaster: String? = masterPassword
+        var prompt: BiometricPrompt? = null
+        fun finishEnrollment(discardKey: Boolean) {
+            if (enrollmentOwner === owner) {
+                enrollmentOwner = null
+                if (discardKey) discardUnenrolledKey()
+            }
+        }
+
         try {
             val secretKey = createFreshKeystoreKey()
             if (!isHardwareBacked(secretKey)) {
-                discardUnenrolledKey()
+                pendingMaster = null
+                finishEnrollment(discardKey = true)
                 onError(activity.getString(R.string.biometric_err_hardware_unverified))
                 return
             }
@@ -107,29 +141,44 @@ class BiometricMasterVault(private val appContext: Context) {
                 .build()
 
             val executor = ContextCompat.getMainExecutor(activity)
-            val prompt = BiometricPrompt(
+            lateinit var authPrompt: BiometricPrompt
+            authPrompt = BiometricPrompt(
                 activity,
                 executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        activePrompts.remove(authPrompt)
+                        if (enrollmentOwner !== owner) return
+                        val secret = pendingMaster
+                        pendingMaster = null
+                        if (!sessionWipes.isCurrent(generation) || secret == null) {
+                            finishEnrollment(discardKey = true)
+                            return
+                        }
                         val unlockedCipher = result.cryptoObject?.cipher
                         if (unlockedCipher == null) {
+                            finishEnrollment(discardKey = true)
                             onError(activity.getString(R.string.biometric_err_cipher))
                             return
                         }
-                        // Normalization also preserves TextEncoder-equivalent behavior for malformed UTF-16.
-                        val plainBytes = Spv2Spec.normalizeMasterToUtf8(masterPassword)
+                        // Use the same NFC and malformed UTF-16 handling as derivation.
+                        val plainBytes = Spv2Spec.normalizeMasterToUtf8(secret)
                         try {
                             val ct = unlockedCipher.doFinal(plainBytes)
                             val iv = unlockedCipher.iv
+                            if (!sessionWipes.isCurrent(generation)) {
+                                finishEnrollment(discardKey = true)
+                                return
+                            }
                             prefs.edit()
                                 .putString(PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
                                 .putString(PREF_CT, Base64.encodeToString(ct, Base64.NO_WRAP))
                                 .apply()
                             _isEnrolled.value = true
+                            finishEnrollment(discardKey = false)
                             onSuccess()
                         } catch (e: Exception) {
-                            discardUnenrolledKey()
+                            finishEnrollment(discardKey = true)
                             onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
                         } finally {
                             Spv2Spec.zeroize(plainBytes)
@@ -137,7 +186,12 @@ class BiometricMasterVault(private val appContext: Context) {
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                        activePrompts.remove(authPrompt)
+                        pendingMaster = null
+                        if (enrollmentOwner !== owner) return
+                        finishEnrollment(discardKey = true)
+                        if (sessionWipes.isCurrent(generation) &&
+                            errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
                             errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
                             errorCode != BiometricPrompt.ERROR_CANCELED
                         ) {
@@ -146,10 +200,19 @@ class BiometricMasterVault(private val appContext: Context) {
                     }
                 }
             )
-            prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+            prompt = authPrompt
+            activePrompts[authPrompt] = {
+                pendingMaster = null
+                finishEnrollment(discardKey = true)
+            }
+            authPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (e: Exception) {
-            discardUnenrolledKey()
-            onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+            prompt?.let { activePrompts.remove(it) }
+            pendingMaster = null
+            finishEnrollment(discardKey = true)
+            if (sessionWipes.isCurrent(generation)) {
+                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+            }
         }
     }
 
@@ -174,6 +237,8 @@ class BiometricMasterVault(private val appContext: Context) {
             return
         }
 
+        val generation = sessionWipes.generation.value
+        var prompt: BiometricPrompt? = null
         try {
             val iv = Base64.decode(ivB64, Base64.NO_WRAP)
             val ct = Base64.decode(ctB64, Base64.NO_WRAP)
@@ -188,11 +253,13 @@ class BiometricMasterVault(private val appContext: Context) {
                 .build()
 
             val executor = ContextCompat.getMainExecutor(activity)
-            val prompt = BiometricPrompt(
+            lateinit var authPrompt: BiometricPrompt
+            authPrompt = BiometricPrompt(
                 activity,
                 executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        if (activePrompts.remove(authPrompt) == null || !sessionWipes.isCurrent(generation)) return
                         val unlockedCipher = result.cryptoObject?.cipher
                         if (unlockedCipher == null) {
                             onError(activity.getString(R.string.biometric_err_cipher))
@@ -201,17 +268,22 @@ class BiometricMasterVault(private val appContext: Context) {
                         var plainBytes: ByteArray? = null
                         try {
                             plainBytes = unlockedCipher.doFinal(ct)
-                            val secret = String(plainBytes, Charsets.UTF_8)
-                            onSuccess(secret)
+                            if (sessionWipes.isCurrent(generation)) {
+                                onSuccess(String(plainBytes, Charsets.UTF_8))
+                            }
                         } catch (e: Exception) {
-                            onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                            if (sessionWipes.isCurrent(generation)) {
+                                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                            }
                         } finally {
                             Spv2Spec.zeroize(plainBytes)
                         }
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                        if (activePrompts.remove(authPrompt) == null) return
+                        if (sessionWipes.isCurrent(generation) &&
+                            errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
                             errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON &&
                             errorCode != BiometricPrompt.ERROR_CANCELED
                         ) {
@@ -220,11 +292,19 @@ class BiometricMasterVault(private val appContext: Context) {
                     }
                 }
             )
-            prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+            prompt = authPrompt
+            activePrompts[authPrompt] = { }
+            authPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: KeyPermanentlyInvalidatedException) {
-            onError(activity.getString(R.string.biometric_err_key_invalidated))
+            prompt?.let { activePrompts.remove(it) }
+            if (sessionWipes.isCurrent(generation)) {
+                onError(activity.getString(R.string.biometric_err_key_invalidated))
+            }
         } catch (e: Exception) {
-            onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+            prompt?.let { activePrompts.remove(it) }
+            if (sessionWipes.isCurrent(generation)) {
+                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+            }
         }
     }
 
@@ -232,6 +312,7 @@ class BiometricMasterVault(private val appContext: Context) {
      * Destroys the Android Keystore hardware key and wipes encrypted ciphertext.
      */
     fun clearVault() {
+        cancelPendingAuthentication()
         prefs.edit().clear().apply()
         runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }

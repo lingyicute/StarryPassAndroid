@@ -59,6 +59,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +82,7 @@ import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.data.AppSettings
 import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.BiometricHardwareStatus
+import io.github.lingyicute.starrypass.security.SessionWipeSignal
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -90,6 +92,7 @@ fun SecuritySettingsScreen(
     biometricEnrolled: Boolean,
     biometricHardwareStatus: BiometricHardwareStatus,
     currentMasterDraft: String,
+    sessionWipes: SessionWipeSignal,
     onDynamicColorChange: (Boolean) -> Unit,
     onThemeChange: (ThemePreference) -> Unit,
     onColorizeChange: (Boolean) -> Unit,
@@ -107,6 +110,16 @@ fun SecuritySettingsScreen(
 
     var autofillEnabled by remember { mutableStateOf(false) }
     var showEnrollDialog by remember { mutableStateOf(false) }
+    var observedWipe by remember(sessionWipes) { mutableStateOf(sessionWipes.generation.value) }
+
+    LaunchedEffect(sessionWipes) {
+        sessionWipes.generation.collect { generation ->
+            if (generation != observedWipe) {
+                observedWipe = generation
+                showEnrollDialog = false
+            }
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

@@ -143,6 +143,7 @@
     <string name="biometric_err_key_invalidated">System biometrics changed and the key is invalid. Revoke the stored vault before re-enrolling.</string>
     <string name="biometric_err_hardware_unverified">A hardware-backed Keystore key could not be verified. The existing vault, if any, is kept; you can revoke it in settings.</string>
     <string name="biometric_err_existing_vault">A vault already exists. Revoke it in settings before enrolling again.</string>
+    <string name="biometric_err_auth_in_progress">Biometric enrollment is already in progress.</string>
 
     <string name="settings_autofill_section">System Autofill Service</string>
     <string name="settings_autofill_enabled">StarryPass Autofill is Active</string>

@@ -1,6 +1,7 @@
 package io.github.lingyicute.starrypass
 
 import io.github.lingyicute.starrypass.crypto.DeriveResult
+import io.github.lingyicute.starrypass.security.SessionWipeSignal
 import io.github.lingyicute.starrypass.ui.GeneratorDerivationCoordinator
 import io.github.lingyicute.starrypass.ui.GeneratorUiState
 import kotlinx.coroutines.CancellationException
@@ -56,6 +57,29 @@ class GeneratorDerivationCoordinatorTest {
         assertEquals("current", state.value.derivedPassword)
         assertFalse(state.value.isDeriving)
         assertTrue(state.value.katVerified)
+    }
+
+    @Test
+    fun `wipe generation blocks a result before UI collectors have run`() = runTest {
+        val signal = SessionWipeSignal()
+        val oldToken = signal.generation.value
+        val gate = CompletableDeferred<DeriveResult>()
+        val state = MutableStateFlow(GeneratorUiState(master = "master", code = "site"))
+        val coordinator = GeneratorDerivationCoordinator(
+            scope = this,
+            state = state,
+            derive = { gate.await() },
+            isSelfTestVerified = { true },
+            currentWipeGeneration = { signal.generation.value }
+        )
+        coordinator.updateInputs(0) { it.copy(length = 18) }
+        runCurrent()
+        signal.invalidate()
+        assertFalse(signal.isCurrent(oldToken))
+        assertTrue(signal.isCurrent(signal.generation.value))
+        gate.complete(DeriveResult("late secret", false, 1))
+        runCurrent()
+        assertNull(state.value.derivedPassword)
     }
 
     @Test
