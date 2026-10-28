@@ -2,6 +2,7 @@ package io.github.lingyicute.starrypass
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.lingyicute.starrypass.data.PreferencesRepository
+import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.SitePreset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,32 @@ class PreferencesRepositoryTest {
         assertEquals("", cleared.alias)
         assertEquals("", cleared.autofillDomain)
         assertEquals("", cleared.autofillPackage)
+    }
+
+    @Test
+    fun `rotation reaches 9999 once and then rejects without modifying the preset`() = runBlocking {
+        val repo = repository()
+        val preset = SitePreset(code = "example", counter = 9998)
+        repo.upsertPreset(preset)
+        val first = repo.incrementPresetCounter(preset.id) as PresetRotationResult.Updated
+        assertEquals(9999, first.preset.counter)
+        assertEquals(PresetRotationResult.LimitReached, repo.incrementPresetCounter(preset.id))
+        assertEquals(first.preset, repo.presetsFlow.first().single())
+        assertEquals(PresetRotationResult.NotFound, repo.incrementPresetCounter("missing"))
+    }
+
+    @Test
+    fun `concurrent rotations at the boundary have exactly one success`() = runBlocking {
+        val repo = repository()
+        val preset = SitePreset(code = "example", counter = 9998)
+        repo.upsertPreset(preset)
+        val results = awaitAll(
+            async(Dispatchers.Default) { repo.incrementPresetCounter(preset.id) },
+            async(Dispatchers.Default) { repo.incrementPresetCounter(preset.id) }
+        )
+        assertEquals(1, results.count { it is PresetRotationResult.Updated })
+        assertEquals(1, results.count { it == PresetRotationResult.LimitReached })
+        assertEquals(9999, repo.presetsFlow.first().single().counter)
     }
 
     @Test

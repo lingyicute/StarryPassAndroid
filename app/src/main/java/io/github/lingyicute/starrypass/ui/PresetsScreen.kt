@@ -280,14 +280,20 @@ fun PresetsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
                                 ) {
-                                    OutlinedButton(onClick = { onRotatePreset(preset) }) {
+                                    OutlinedButton(
+                                        onClick = { onRotatePreset(preset) },
+                                        enabled = preset.counter < Spv2Spec.MAX_COUNTER
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Autorenew,
                                             contentDescription = null,
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(Modifier.width(6.dp))
-                                        Text(stringResource(R.string.preset_rotate_plus_one))
+                                        Text(stringResource(
+                                            if (preset.counter >= Spv2Spec.MAX_COUNTER) R.string.preset_rotation_limit_button
+                                            else R.string.preset_rotate_plus_one
+                                        ))
                                     }
                                     Button(onClick = { onUsePreset(preset) }) {
                                         Icon(

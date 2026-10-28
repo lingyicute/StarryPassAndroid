@@ -19,6 +19,7 @@ import io.github.lingyicute.starrypass.crypto.Spv2Tier
 import io.github.lingyicute.starrypass.crypto.StrengthEstimate
 import io.github.lingyicute.starrypass.crypto.StrengthReason
 import io.github.lingyicute.starrypass.data.AppSettings
+import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.SitePreset
 import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.BiometricHardwareStatus
@@ -216,16 +217,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { prefsRepo.deletePreset(id) }
     }
 
-    fun incrementPresetRotation(id: String, onRotated: (SitePreset) -> Unit) {
+    fun incrementPresetRotation(id: String, onResult: (PresetRotationResult) -> Unit) {
         viewModelScope.launch {
-            val updated = prefsRepo.incrementPresetCounter(id)
-            if (updated != null) {
+            val result = prefsRepo.incrementPresetCounter(id)
+            if (result is PresetRotationResult.Updated) {
                 // If this preset's code is currently active in the generator, sync its counter too!
-                if (Spv2Spec.ecmaTrim(_uiState.value.code) == updated.code) {
-                    onCounterChanged(updated.counter)
+                if (Spv2Spec.ecmaTrim(_uiState.value.code) == result.preset.code) {
+                    onCounterChanged(result.preset.counter)
                 }
-                onRotated(updated)
             }
+            onResult(result)
         }
     }
 

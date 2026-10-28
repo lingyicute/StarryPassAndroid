@@ -64,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import io.github.lingyicute.starrypass.R
+import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.ScreenSecurityEffect
 import kotlinx.coroutines.launch
@@ -282,12 +283,15 @@ fun StarryPassRootScreen(
                     },
                     onUpsertPreset = viewModel::upsertPreset,
                     onRotatePreset = { preset ->
-                        viewModel.incrementPresetRotation(preset.id) { updated ->
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    activity.getString(R.string.preset_rotated_toast, updated.displayName, updated.counter)
+                        viewModel.incrementPresetRotation(preset.id) { result ->
+                            val message = when (result) {
+                                is PresetRotationResult.Updated -> activity.getString(
+                                    R.string.preset_rotated_toast, result.preset.displayName, result.preset.counter
                                 )
+                                PresetRotationResult.LimitReached -> activity.getString(R.string.preset_rotation_limit_message)
+                                PresetRotationResult.NotFound -> activity.getString(R.string.preset_rotation_missing)
                             }
+                            scope.launch { snackbarHostState.showSnackbar(message) }
                         }
                     },
                     onDeletePreset = viewModel::deletePreset,

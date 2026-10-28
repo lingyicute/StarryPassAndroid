@@ -105,6 +105,9 @@
     <string name="preset_field_package">Autofill App Package (optional, e.g. com.github.android)</string>
     <string name="preset_rotate_plus_one">Rotate +1</string>
     <string name="preset_rotated_toast">Rotated %1$s to #%2$d</string>
+    <string name="preset_rotation_limit_button">Limit: 9999</string>
+    <string name="preset_rotation_limit_message">Rotation limit 9999 reached; the counter was not changed.</string>
+    <string name="preset_rotation_missing">This preset no longer exists.</string>
 
     <!-- Security & Settings Tab -->
     <string name="settings_appearance_section">Material You &amp; Appearance</string>
