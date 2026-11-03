@@ -258,7 +258,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val cleanId = Spv2Spec.ecmaTrim(decoded.id).ifEmpty {
                 UUID.nameUUIDFromBytes(cleanCode.toByteArray(Charsets.UTF_8)).toString()
             }
-            if (!seenIds.add(cleanId) || !seenCodes.add(cleanCode)) return@mapNotNull null
+            // Check both before recording either, so a rejected entry cannot reserve its id.
+            if (cleanId in seenIds || cleanCode in seenCodes) return@mapNotNull null
+            seenIds.add(cleanId)
+            seenCodes.add(cleanCode)
             decoded.copy(
                 id = cleanId,
                 code = cleanCode,
