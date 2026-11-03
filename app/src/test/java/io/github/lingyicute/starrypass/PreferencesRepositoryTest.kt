@@ -1,6 +1,8 @@
 package io.github.lingyicute.starrypass
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.github.lingyicute.starrypass.data.PreferencesRepository
 import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.SitePreset
@@ -136,5 +138,22 @@ class PreferencesRepositoryTest {
         assertEquals(specific.id, repo.findMatchingPreset("admin.example.com", null)?.id)
         assertEquals(specific.id, repo.findMatchingPreset("eu.admin.example.com", null)?.id)
         assertEquals(parent.id, repo.findMatchingPreset("shop.example.com", null)?.id)
+    }
+
+    @Test
+    fun `one unreadable stored preset does not hide or erase the others`() = runBlocking {
+        val file = temporaryFolder.newFile("damaged.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"a","code":"alpha"},{"id":"broken"},{"id":"b","code":"beta","length":"x"}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        assertEquals(listOf("alpha"), repo.presetsFlow.first().map { it.code })
+
+        repo.upsertPreset(SitePreset(code = "gamma"))
+
+        assertEquals(setOf("alpha", "gamma"), repo.presetsFlow.first().map { it.code }.toSet())
     }
 }
