@@ -115,4 +115,38 @@ class GeneratorDerivationCoordinatorTest {
         assertFalse(state.value.isDeriving)
         assertEquals(Spv2ErrorCode.OUT_OF_MEMORY, state.value.errorCode)
     }
+
+    @Test
+    fun `unchanged inputs preserve derived password and do not restart active derivation`() = runTest {
+        var calls = 0
+        val gate = CompletableDeferred<DeriveResult>()
+        val state = MutableStateFlow(GeneratorUiState(master = "master", code = "site"))
+        val coordinator = GeneratorDerivationCoordinator(
+            scope = this,
+            state = state,
+            derive = {
+                calls++
+                gate.await()
+            },
+            isSelfTestVerified = { true }
+        )
+
+        coordinator.updateInputs(280) { it.copy(length = 20) }
+        advanceTimeBy(200)
+        // Sub-integer slider movement rounding to the same length must not reset debounce or re-derive.
+        coordinator.updateInputs(280) { it.copy(length = 20) }
+        advanceTimeBy(80)
+        runCurrent()
+        assertEquals(1, calls)
+
+        gate.complete(DeriveResult("derived-20", false, 5))
+        runCurrent()
+        assertEquals("derived-20", state.value.derivedPassword)
+
+        // Re-selecting the same length or policy keeps the existing derived password without re-running derive.
+        coordinator.updateInputs(0) { it.copy(length = 20) }
+        runCurrent()
+        assertEquals(1, calls)
+        assertEquals("derived-20", state.value.derivedPassword)
+    }
 }

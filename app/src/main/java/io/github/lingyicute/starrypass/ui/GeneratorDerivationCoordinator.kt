@@ -32,17 +32,55 @@ internal class GeneratorDerivationCoordinator(
 ) {
     private var job: Job? = null
     private var sequence = 0L
+    private var activeDebounceMs = 0L
 
     fun cancel() {
         job?.cancel()
         job = null
+        activeDebounceMs = 0L
         sequence++
     }
 
+    private fun sameDeriveInputs(a: GeneratorUiState, b: GeneratorUiState): Boolean =
+        a.master == b.master &&
+            a.code == b.code &&
+            a.length == b.length &&
+            a.mode == b.mode &&
+            a.counter == b.counter &&
+            a.tier == b.tier
+
     fun updateInputs(debounceMs: Long, change: (GeneratorUiState) -> GeneratorUiState) {
+        val current = state.value
+        val candidate = change(current)
+        if (sameDeriveInputs(current, candidate)) {
+            val ready = candidate.master.isNotEmpty() && Spv2Spec.ecmaTrim(candidate.code).isNotEmpty()
+            val canKeepState = current.derivedPassword != null ||
+                (current.isDeriving && job?.isActive == true && debounceMs >= activeDebounceMs) ||
+                (!ready && !current.isDeriving && current.derivedPassword == null && current.errorCode == null)
+            if (canKeepState) {
+                state.update { prev ->
+                    if (sameDeriveInputs(prev, candidate)) {
+                        candidate.copy(
+                            derivedPassword = prev.derivedPassword,
+                            isDeriving = prev.isDeriving,
+                            lastCached = prev.lastCached,
+                            lastElapsedMs = prev.lastElapsedMs,
+                            errorCode = prev.errorCode,
+                            strength = prev.strength,
+                            katVerified = prev.katVerified
+                        )
+                    } else {
+                        prev
+                    }
+                }
+                return
+            }
+        }
+
         cancel()
         val seq = sequence
         val wipeGeneration = currentWipeGeneration()
+        activeDebounceMs = debounceMs
         // Change the inputs and invalidate the previous output in one state update.
         val snapshot = state.updateAndGet { previous ->
             val next = change(previous)
