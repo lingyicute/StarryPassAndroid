@@ -232,12 +232,17 @@ class AutofillAuthActivity : FragmentActivity() {
                 }
             }
 
-            fun dismissAutofill() {
+            fun cancelInFlightDerive() {
                 deriveJob?.cancel()
                 deriveJob = null
+                busy = false
+                errorMsg = null
+            }
+
+            fun dismissAutofill() {
+                cancelInFlightDerive()
                 master = ""
                 showMaster = false
-                busy = false
                 app.biometricVault.cancelPendingAuthentication()
                 cancelAutofill()
             }
@@ -375,9 +380,10 @@ class AutofillAuthActivity : FragmentActivity() {
                                         style = MaterialTheme.typography.titleLarge,
                                         color = colorScheme.onSurface
                                     )
-                                    if (targetLabel.isNotBlank()) {
+                                    val cleanTargetLabel = Spv2Spec.ecmaTrim(targetLabel)
+                                    if (cleanTargetLabel.isNotEmpty()) {
                                         Text(
-                                            text = stringResource(R.string.autofill_detected_target, targetLabel),
+                                            text = stringResource(R.string.autofill_detected_target, cleanTargetLabel),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = colorScheme.onSurfaceVariant
                                         )
@@ -409,6 +415,7 @@ class AutofillAuthActivity : FragmentActivity() {
                                             FilterChip(
                                                 selected = selected,
                                                 onClick = {
+                                                    cancelInFlightDerive()
                                                     val clampedCounter = Spv2Spec.clampCounter(preset.counter)
                                                     code = preset.code
                                                     length = Spv2Spec.clampLength(preset.length)
@@ -435,7 +442,10 @@ class AutofillAuthActivity : FragmentActivity() {
                             // Site Code Input
                             OutlinedTextField(
                                 value = code,
-                                onValueChange = { code = it },
+                                onValueChange = {
+                                    cancelInFlightDerive()
+                                    code = it
+                                },
                                 singleLine = true,
                                 shape = RoundedCornerShape(14.dp),
                                 label = { Text(stringResource(R.string.field_code_label)) },
@@ -451,7 +461,10 @@ class AutofillAuthActivity : FragmentActivity() {
                             // Master Password Input
                             OutlinedTextField(
                                 value = master,
-                                onValueChange = { master = it },
+                                onValueChange = {
+                                    cancelInFlightDerive()
+                                    master = it
+                                },
                                 singleLine = true,
                                 shape = RoundedCornerShape(14.dp),
                                 label = { Text(stringResource(R.string.field_master_label)) },
@@ -460,10 +473,15 @@ class AutofillAuthActivity : FragmentActivity() {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (bioEnrolled) {
                                             IconButton(
+                                                enabled = !busy,
                                                 onClick = {
+                                                    cancelInFlightDerive()
                                                     app.biometricVault.unlockMasterPassword(
                                                         activity = this@AutofillAuthActivity,
-                                                        onSuccess = { unlocked -> master = unlocked },
+                                                        onSuccess = { unlocked ->
+                                                            cancelInFlightDerive()
+                                                            master = unlocked
+                                                        },
                                                         onError = { err -> errorMsg = err }
                                                     )
                                                 }
@@ -587,6 +605,7 @@ class AutofillAuthActivity : FragmentActivity() {
                                                         SegmentedButton(
                                                             selected = mode == m,
                                                             onClick = {
+                                                                cancelInFlightDerive()
                                                                 if (m == Spv2Mode.PIN && length > 8) length = 6
                                                                 else if (mode == Spv2Mode.PIN && m != Spv2Mode.PIN && length <= 8) length = 16
                                                                 mode = m
@@ -622,14 +641,20 @@ class AutofillAuthActivity : FragmentActivity() {
                                                     quickLengths.forEach { presetLen ->
                                                         FilterChip(
                                                             selected = length == presetLen,
-                                                            onClick = { length = presetLen },
+                                                            onClick = {
+                                                                cancelInFlightDerive()
+                                                                length = presetLen
+                                                            },
                                                             label = { Text(presetLen.toString()) }
                                                         )
                                                     }
                                                 }
                                                 Slider(
                                                     value = length.toFloat(),
-                                                    onValueChange = { length = it.roundToInt() },
+                                                    onValueChange = {
+                                                        cancelInFlightDerive()
+                                                        length = it.roundToInt()
+                                                    },
                                                     valueRange = Spv2Spec.MIN_LENGTH.toFloat()..Spv2Spec.MAX_LENGTH.toFloat(),
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
@@ -649,7 +674,11 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 ) {
                                                     FilledTonalIconButton(
                                                         onClick = {
-                                                            if (counter > Spv2Spec.MIN_COUNTER) counter -= 1
+                                                            if (counter > Spv2Spec.MIN_COUNTER) {
+                                                                cancelInFlightDerive()
+                                                                counter -= 1
+                                                                counterText = counter.toString()
+                                                            }
                                                         },
                                                         enabled = counter > Spv2Spec.MIN_COUNTER
                                                     ) {
@@ -661,10 +690,11 @@ class AutofillAuthActivity : FragmentActivity() {
                                                     OutlinedTextField(
                                                         value = counterText,
                                                         onValueChange = { raw ->
-                                                            val digits = raw.filter { it.isDigit() }.take(4)
+                                                            val digits = raw.filter { it in '0'..'9' }.take(4)
                                                             counterText = digits
                                                             digits.toIntOrNull()?.let { parsed ->
                                                                 if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER) {
+                                                                    cancelInFlightDerive()
                                                                     counter = parsed
                                                                 }
                                                             }
@@ -694,7 +724,11 @@ class AutofillAuthActivity : FragmentActivity() {
                                                     )
                                                     FilledTonalIconButton(
                                                         onClick = {
-                                                            if (counter < Spv2Spec.MAX_COUNTER) counter += 1
+                                                            if (counter < Spv2Spec.MAX_COUNTER) {
+                                                                cancelInFlightDerive()
+                                                                counter += 1
+                                                                counterText = counter.toString()
+                                                            }
                                                         },
                                                         enabled = counter < Spv2Spec.MAX_COUNTER
                                                     ) {
@@ -717,14 +751,20 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                                                     SegmentedButton(
                                                         selected = tier == Spv2Tier.STANDARD,
-                                                        onClick = { tier = Spv2Tier.STANDARD },
+                                                        onClick = {
+                                                            cancelInFlightDerive()
+                                                            tier = Spv2Tier.STANDARD
+                                                        },
                                                         shape = SegmentedButtonDefaults.itemShape(0, 2)
                                                     ) {
                                                         Text(stringResource(R.string.tier_standard), maxLines = 1)
                                                     }
                                                     SegmentedButton(
                                                         selected = tier == Spv2Tier.PARANOID,
-                                                        onClick = { tier = Spv2Tier.PARANOID },
+                                                        onClick = {
+                                                            cancelInFlightDerive()
+                                                            tier = Spv2Tier.PARANOID
+                                                        },
                                                         shape = SegmentedButtonDefaults.itemShape(1, 2)
                                                     ) {
                                                         Text(stringResource(R.string.tier_paranoid), maxLines = 1)

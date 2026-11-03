@@ -146,6 +146,10 @@ fun GeneratorScreen(
         }
     }
 
+    LaunchedEffect(uiState.derivedPassword) {
+        justCopied = false
+    }
+
     LaunchedEffect(justCopied) {
         if (justCopied) {
             delay(1_800L)
