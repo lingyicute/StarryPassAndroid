@@ -100,8 +100,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val normalized = preset.copy(
             code = cleanCode,
             alias = preset.alias.trim(),
+            modeKey = preset.mode.key,
             length = Spv2Spec.clampLength(preset.length),
             counter = Spv2Spec.clampCounter(preset.counter),
+            tierKey = preset.tier.key,
             autofillDomain = normalizeDomain(preset.autofillDomain),
             autofillPackage = preset.autofillPackage.trim(),
             updatedAtEpochMs = System.currentTimeMillis()
@@ -229,6 +231,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val array = runCatching { json.parseToJsonElement(raw) as? JsonArray }.getOrNull()
             ?: return emptyList()
         val seenIds = HashSet<String>()
+        val seenCodes = HashSet<String>()
         return array.mapNotNull { element ->
             val decoded = runCatching {
                 json.decodeFromJsonElement(SitePreset.serializer(), element)
@@ -236,7 +239,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
             if (cleanCode.isEmpty()) return@mapNotNull null
             val cleanId = decoded.id.trim().ifEmpty { UUID.randomUUID().toString() }
-            if (!seenIds.add(cleanId)) return@mapNotNull null
+            if (!seenIds.add(cleanId) || !seenCodes.add(cleanCode)) return@mapNotNull null
             decoded.copy(
                 id = cleanId,
                 code = cleanCode,
@@ -245,6 +248,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 length = Spv2Spec.clampLength(decoded.length),
                 counter = Spv2Spec.clampCounter(decoded.counter),
                 tierKey = decoded.tier.key,
+                autofillDomain = normalizeDomain(decoded.autofillDomain),
                 autofillPackage = decoded.autofillPackage.trim()
             )
         }
@@ -277,7 +281,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 (tld.length == 2 && secondLevel in GENERIC_SECOND_LEVEL)
 
         fun normalizeDomain(raw: String): String {
-            var s = raw.trim().lowercase()
+            var s = Spv2Spec.ecmaTrim(raw).lowercase()
             s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
             val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
@@ -287,11 +291,21 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 val close = s.indexOf(']')
                 if (close >= 0) s = s.substring(0, close + 1)
             } else {
-                val colon = s.indexOf(':')
-                if (colon >= 0) s = s.substring(0, colon)
+                val firstColon = s.indexOf(':')
+                if (firstColon >= 0) {
+                    s = if (firstColon != s.lastIndexOf(':')) {
+                        // Unbracketed IPv6 literal (e.g. `2001:db8::1` or `::1`): canonicalise with brackets.
+                        "[$s]"
+                    } else {
+                        s.substring(0, firstColon)
+                    }
+                }
             }
             // Cookie-style entries (`.example.com`, `*.example.com`) already match by suffix.
-            s = s.trimStart('.').removePrefix("*.").trimStart('.').trimEnd('.')
+            while (s.startsWith(".") || s.startsWith("*.")) {
+                s = s.removePrefix("*.").trimStart('.')
+            }
+            s = s.trimEnd('.')
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
                 val parts = withoutWww.split('.').filter { it.isNotEmpty() }
@@ -312,7 +326,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (stem.isNotEmpty()) return stem
             }
             if (!packageName.isNullOrBlank()) {
-                val rawParts = packageName.lowercase().split('.').filter { it.isNotEmpty() }
+                val rawParts = Spv2Spec.ecmaTrim(packageName).lowercase().split('.').filter { it.isNotEmpty() }
                 val meaningful = rawParts
                     .drop(if (rawParts.size >= 2) 1 else 0) // drop leading TLD (com, org, ch, de, io, jp, ...)
                     .filterNot {
