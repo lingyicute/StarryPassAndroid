@@ -79,6 +79,8 @@ class SecureClipboardManager(context: Context) {
         clearJob?.cancel()
         if (seconds <= 0) {
             _remainingSeconds.value = 0
+            Spv2Spec.zeroize(lastCopiedSha256)
+            lastCopiedSha256 = null
             return
         }
         clearJob = scope.launch {
@@ -89,9 +91,9 @@ class SecureClipboardManager(context: Context) {
                 rem--
                 _remainingSeconds.value = rem
             }
-            // Only clear if the clipboard still holds the exact password we copied
+            // Clear unless the clipboard is readable and now holds something else
             val expectedHash = lastCopiedSha256
-            if (expectedHash != null && currentClipMatchesHash(expectedHash)) {
+            if (expectedHash != null && shouldWipeNow(expectedHash)) {
                 wipeSystemClipboard()
             }
             Spv2Spec.zeroize(lastCopiedSha256)
@@ -99,16 +101,12 @@ class SecureClipboardManager(context: Context) {
         }
     }
 
-    private fun currentClipMatchesHash(expectedSha256: ByteArray): Boolean {
-        val currentText = runCatching {
-            clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-        }.getOrNull() ?: return false
-        val bytes = currentText.toByteArray(Charsets.UTF_8)
-        val currentHash = Spv2Primitives.sha256(bytes)
-        Spv2Spec.zeroize(bytes)
-        val matches = Spv2Primitives.constantTimeEquals(currentHash, expectedSha256)
-        Spv2Spec.zeroize(currentHash)
-        return matches
+    private fun shouldWipeNow(expectedSha256: ByteArray): Boolean {
+        // Android 10+ returns null to an app that is not focused, so null cannot prove
+        // that the clipboard no longer holds our password.
+        val clip = runCatching { clipboard.primaryClip }.getOrNull()
+        val text = runCatching { clip?.getItemAt(0)?.text?.toString() }.getOrNull()
+        return ClipboardWipePolicy.shouldWipe(expectedSha256, clip != null, text)
     }
 
     private fun wipeSystemClipboard() {
@@ -119,5 +117,22 @@ class SecureClipboardManager(context: Context) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
             }
         }
+    }
+}
+
+internal object ClipboardWipePolicy {
+    /**
+     * [clipReadable] is false when the clipboard is empty or hidden from this app;
+     * [currentText] is the text of a readable clip, or null for non-text content.
+     */
+    fun shouldWipe(expectedSha256: ByteArray, clipReadable: Boolean, currentText: String?): Boolean {
+        if (!clipReadable) return true
+        if (currentText == null) return false
+        val bytes = currentText.toByteArray(Charsets.UTF_8)
+        val currentHash = Spv2Primitives.sha256(bytes)
+        Spv2Spec.zeroize(bytes)
+        val matches = Spv2Primitives.constantTimeEquals(currentHash, expectedSha256)
+        Spv2Spec.zeroize(currentHash)
+        return matches
     }
 }
