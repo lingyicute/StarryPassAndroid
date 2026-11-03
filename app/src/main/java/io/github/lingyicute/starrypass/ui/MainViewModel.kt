@@ -95,6 +95,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             app.sessionWipes.generation.collect { generation ->
                 if (generation != observedWipe) {
                     observedWipe = generation
+                    biometricVault.cancelPendingAuthentication()
                     derivation.cancel()
                     _uiState.update { state ->
                         state.copy(
@@ -126,6 +127,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetAll() {
+        app.sessionWipes.invalidate()
         biometricVault.cancelPendingAuthentication()
         derivation.cancel()
         _uiState.update {
@@ -251,9 +253,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = prefsRepo.incrementPresetCounter(id)
             if (result is PresetRotationResult.Updated) {
-                // If this preset's code is currently active in the generator, sync its counter too!
+                // If this preset's code is currently active in the generator, sync its policy too!
                 if (Spv2Spec.ecmaTrim(_uiState.value.code) == result.preset.code) {
-                    onCounterChanged(result.preset.counter)
+                    applyPreset(result.preset)
                 }
             }
             onResult(result)
