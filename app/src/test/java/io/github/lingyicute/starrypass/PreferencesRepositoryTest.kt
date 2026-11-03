@@ -201,4 +201,20 @@ class PreferencesRepositoryTest {
         assertEquals(64, loaded.length)
         assertEquals(1, loaded.counter)
     }
+
+    @Test
+    fun `decodePresets normalises autofillDomain and skips duplicate site codes`() = runBlocking {
+        val file = temporaryFolder.newFile("dup_codes.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"id1","code":" github ","autofillDomain":"https://WWW.GitHub.com/login"},{"id":"id2","code":"github","autofillDomain":"gist.github.com"}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        val loaded = repo.presetsFlow.first().single()
+        assertEquals("id1", loaded.id)
+        assertEquals("github", loaded.code)
+        assertEquals("github.com", loaded.autofillDomain)
+    }
 }

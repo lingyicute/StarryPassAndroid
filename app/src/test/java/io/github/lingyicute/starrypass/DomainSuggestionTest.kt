@@ -56,6 +56,10 @@ class DomainSuggestionTest {
         assertEquals("localhost", PreferencesRepository.normalizeDomain("localhost:8080"))
         assertEquals("[::1]", PreferencesRepository.normalizeDomain("http://[::1]:8080/path"))
         assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("[2001:db8::1]"))
+        assertEquals("[::1]", PreferencesRepository.normalizeDomain("::1"))
+        assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("2001:db8::1"))
+        assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("::ffff:192.168.1.1"))
+        assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, " com.github.android "))
     }
 
     @Test
