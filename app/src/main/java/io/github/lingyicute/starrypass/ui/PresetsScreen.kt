@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -63,8 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -346,6 +349,7 @@ private fun PresetEditDialog(
     onDismiss: () -> Unit,
     onConfirm: (SitePreset) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var alias by remember { mutableStateOf(initial?.alias ?: "") }
     var length by remember { mutableIntStateOf(Spv2Spec.clampLength(initial?.length)) }
@@ -431,7 +435,16 @@ private fun PresetEditDialog(
                         },
                         singleLine = true,
                         label = { Text("#") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                counterText = counter.toString()
+                                focusManager.clearFocus()
+                            }
+                        ),
                         modifier = Modifier
                             .width(96.dp)
                             .onFocusChanged { focus ->
@@ -486,13 +499,13 @@ private fun PresetEditDialog(
                     val ctr = Spv2Spec.clampCounter(counter)
                     val result = (initial ?: SitePreset(code = code)).copy(
                         code = Spv2Spec.ecmaTrim(code),
-                        alias = alias.trim(),
+                        alias = Spv2Spec.ecmaTrim(alias),
                         length = Spv2Spec.clampLength(length),
                         modeKey = mode.key,
                         counter = ctr,
                         tierKey = tier.key,
-                        autofillDomain = domain.trim(),
-                        autofillPackage = pkg.trim()
+                        autofillDomain = Spv2Spec.ecmaTrim(domain),
+                        autofillPackage = Spv2Spec.ecmaTrim(pkg)
                     )
                     onConfirm(result)
                 }

@@ -38,7 +38,7 @@ data class SitePreset(
         get() = Spv2Tier.fromKey(tierKey)
 
     val displayName: String
-        get() = alias.ifBlank { code }
+        get() = Spv2Spec.ecmaTrim(alias).ifEmpty { Spv2Spec.ecmaTrim(code) }
 }
 
 sealed interface PresetRotationResult {

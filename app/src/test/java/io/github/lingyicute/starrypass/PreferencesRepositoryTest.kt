@@ -217,4 +217,23 @@ class PreferencesRepositoryTest {
         assertEquals("github", loaded.code)
         assertEquals("github.com", loaded.autofillDomain)
     }
+
+    @Test
+    fun `ecmaTrim sanitizes non-ASCII whitespace in alias and package and matches parent domain codes`() = runBlocking {
+        val repo = repository()
+        val preset = SitePreset(
+            id = "\uFEFFid-domain\u00A0",
+            code = "github.com",
+            alias = "\u00A0\u3000\uFEFF",
+            autofillPackage = "\u00A0com.github.android\u3000"
+        )
+        repo.upsertPreset(preset)
+
+        val saved = repo.presetsFlow.first().single()
+        assertEquals("", saved.alias)
+        assertEquals("github.com", saved.displayName)
+        assertEquals("com.github.android", saved.autofillPackage)
+        assertEquals(saved.id, repo.findMatchingPreset("https://sso.github.com/login", null)?.id)
+        assertEquals(saved.id, repo.findMatchingPreset(null, "\uFEFFcom.github.android\u00A0")?.id)
+    }
 }

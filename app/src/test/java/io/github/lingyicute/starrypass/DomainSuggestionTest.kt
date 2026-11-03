@@ -58,6 +58,9 @@ class DomainSuggestionTest {
         assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("[2001:db8::1]"))
         assertEquals("[::1]", PreferencesRepository.normalizeDomain("::1"))
         assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("2001:db8::1"))
+        assertEquals("", PreferencesRepository.normalizeDomain("[]:8080"))
+        assertEquals("", PreferencesRepository.normalizeDomain("[::1"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("https:// example.com :8443/login"))
         assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("::ffff:192.168.1.1"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, " com.github.android "))
     }
