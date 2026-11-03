@@ -24,6 +24,13 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `keeps IPv4 addresses whole instead of using the last octet as the site code`() {
+        assertEquals("192.168.1.1", PreferencesRepository.suggestCodeFromContext("http://192.168.1.1:8080/login", null))
+        assertEquals("192.168.1.1", PreferencesRepository.extractDomainStem("192.168.1.1"))
+        assertEquals("example", PreferencesRepository.extractDomainStem("1.example.com"))
+    }
+
+    @Test
     fun `normalizes domains that carry credentials, query, fragment, port or a trailing dot`() {
         assertEquals("example.com", PreferencesRepository.normalizeDomain("https://User:pw@WWW.Example.com.:8443/a?b#c"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain("example.com?next=/home"))
