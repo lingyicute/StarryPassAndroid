@@ -264,4 +264,15 @@ class PreferencesRepositoryTest {
         val localhostPreset = repo.findMatchingPreset("http://localhost:3000/login", null)!!
         assertEquals("local", localhostPreset.id)
     }
+
+    @Test
+    fun `purpose-qualified site code does not shadow stem preset during domain autofill matching`() = runBlocking {
+        val repo = repository()
+        val mainPreset = SitePreset(id = "main", code = "github")
+        val tokenPreset = SitePreset(id = "token", code = "github.com/token")
+        repo.upsertPreset(mainPreset)
+        repo.upsertPreset(tokenPreset)
+
+        assertEquals("main", repo.findMatchingPreset("https://github.com/login", null)?.id)
+    }
 }

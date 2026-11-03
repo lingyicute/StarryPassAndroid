@@ -61,6 +61,13 @@ class DomainSuggestionTest {
         assertEquals("", PreferencesRepository.normalizeDomain("[]:8080"))
         assertEquals("", PreferencesRepository.normalizeDomain("[::1"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain("https:// example.com :8443/login"))
+        assertEquals("gist.github.com", PreferencesRepository.normalizeDomain("blob:https://gist.github.com/1234-5678"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("view-source:https://www.example.com/login"))
+        assertEquals("", PreferencesRepository.normalizeDomain("about:blank"))
+        assertEquals("", PreferencesRepository.normalizeDomain("javascript:void(0)"))
+        assertEquals("", PreferencesRepository.normalizeDomain("[::1]:notaport"))
+        assertEquals("", PreferencesRepository.normalizeDomain("[not-an-ipv6]"))
+        assertEquals("chrome", PreferencesRepository.suggestCodeFromContext("about:blank", "com.android.chrome"))
         assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("::ffff:192.168.1.1"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, " com.github.android "))
     }

@@ -10,6 +10,7 @@ import android.text.InputType
 import android.view.View
 import android.view.autofill.AutofillId
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
+import io.github.lingyicute.starrypass.data.PreferencesRepository
 
 internal data class ParsedAutofillStructure(
     val passwordIds: List<AutofillId>,
@@ -125,7 +126,9 @@ internal object AssistStructureParser {
         passwordIds: MutableList<AutofillId>,
         allEditableIds: MutableList<AutofillId>
     ) {
-        val dom = node.webDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() }
+        val dom = node.webDomain
+            ?.let(Spv2Spec::ecmaTrim)
+            ?.takeIf { PreferencesRepository.normalizeDomain(it).isNotEmpty() }
         if (dom != null) {
             onDomain(dom)
         }
@@ -161,8 +164,17 @@ internal object AssistStructureParser {
         // is never treated as text input even when a WebView reports autofillType == AUTOFILL_TYPE_TEXT.
         val htmlTag = node.htmlInfo?.tag?.let(Spv2Spec::ecmaTrim)
         if (!htmlTag.isNullOrEmpty()) {
+            val attrs = node.htmlInfo?.attributes
+            if (attrs?.any { attr ->
+                    val name = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase()
+                    val value = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase()
+                    (name == "disabled" || name == "readonly") && value != "false"
+                } == true
+            ) {
+                return false
+            }
             if (htmlTag.equals("input", ignoreCase = true)) {
-                val typeAttr = node.htmlInfo?.attributes
+                val typeAttr = attrs
                     ?.firstOrNull { it.first?.let(Spv2Spec::ecmaTrim)?.equals("type", ignoreCase = true) == true }
                     ?.second
                     ?.let(Spv2Spec::ecmaTrim)
@@ -189,9 +201,11 @@ internal object AssistStructureParser {
             }
             if (cleanHints.any { hint ->
                     hint.equals(View.AUTOFILL_HINT_USERNAME, ignoreCase = true) ||
+                        hint.contains("username", ignoreCase = true) ||
                         hint.equals(View.AUTOFILL_HINT_EMAIL_ADDRESS, ignoreCase = true) ||
-                        hint.equals("email", ignoreCase = true) ||
+                        hint.contains("email", ignoreCase = true) ||
                         hint.equals(View.AUTOFILL_HINT_PHONE, ignoreCase = true) ||
+                        hint.contains("phone", ignoreCase = true) ||
                         hint.equals(View.AUTOFILL_HINT_NAME, ignoreCase = true) ||
                         hint.equals("one-time-code", ignoreCase = true) ||
                         hint.contains("otp", ignoreCase = true)
@@ -249,6 +263,9 @@ internal object AssistStructureParser {
                 ) {
                     return false
                 }
+            }
+            if (klass == InputType.TYPE_CLASS_PHONE || klass == InputType.TYPE_CLASS_DATETIME) {
+                return false
             }
             if (klass == InputType.TYPE_CLASS_NUMBER &&
                 variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
