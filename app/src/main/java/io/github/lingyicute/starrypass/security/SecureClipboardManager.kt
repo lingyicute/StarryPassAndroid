@@ -42,8 +42,13 @@ class SecureClipboardManager(context: Context) {
     private val clipChangedListener = ClipboardManager.OnPrimaryClipChangedListener {
         if (ownChangesPending > 0) {
             ownChangesPending--
-        } else if (lastCopiedSha256 != null) {
-            replacedByOther = true
+        } else {
+            val expectedHash = lastCopiedSha256 ?: return@OnPrimaryClipChangedListener
+            val clip = runCatching { clipboard.primaryClip }.getOrNull()
+            val text = runCatching { clip?.getItemAt(0)?.text?.toString() }.getOrNull()
+            if (ClipboardWipePolicy.isReplacedByOther(expectedHash, clip != null, text)) {
+                replacedByOther = true
+            }
         }
     }
 
@@ -102,8 +107,7 @@ class SecureClipboardManager(context: Context) {
         if (expectedHash != null && shouldWipeNow(expectedHash)) {
             wipeSystemClipboard()
         }
-        Spv2Spec.zeroize(lastCopiedSha256)
-        lastCopiedSha256 = null
+        resetTrackedCopy()
     }
 
     fun onAutoClearTimeoutChanged(seconds: Int) {
@@ -113,11 +117,19 @@ class SecureClipboardManager(context: Context) {
             _remainingSeconds.value = 0
             return
         }
+        val expectedHash = lastCopiedSha256 ?: return
+        if (!shouldWipeNow(expectedHash)) {
+            clearJob?.cancel()
+            clearJob = null
+            _remainingSeconds.value = 0
+            resetTrackedCopy()
+            return
+        }
         if (clearJob?.isActive == true) {
             if (_remainingSeconds.value > seconds) {
                 scheduleAutoClear(seconds)
             }
-        } else if (lastCopiedSha256 != null) {
+        } else {
             scheduleAutoClear(seconds)
         }
     }
@@ -144,9 +156,15 @@ class SecureClipboardManager(context: Context) {
             if (expectedHash != null && shouldWipeNow(expectedHash)) {
                 wipeSystemClipboard()
             }
-            Spv2Spec.zeroize(lastCopiedSha256)
-            lastCopiedSha256 = null
+            resetTrackedCopy()
         }
+    }
+
+    private fun resetTrackedCopy() {
+        Spv2Spec.zeroize(lastCopiedSha256)
+        lastCopiedSha256 = null
+        ownChangesPending = 0
+        replacedByOther = false
     }
 
     private fun shouldWipeNow(expectedSha256: ByteArray): Boolean {
@@ -158,14 +176,13 @@ class SecureClipboardManager(context: Context) {
     }
 
     private fun wipeSystemClipboard() {
-        ownChangesPending++
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 clipboard.clearPrimaryClip()
             } else {
                 clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
             }
-        }.onFailure { ownChangesPending-- }
+        }
     }
 }
 
@@ -189,5 +206,19 @@ internal object ClipboardWipePolicy {
         val matches = Spv2Primitives.constantTimeEquals(currentHash, expectedSha256)
         Spv2Spec.zeroize(currentHash)
         return matches
+    }
+
+    /**
+     * Determines whether an unawaited primary-clip change callback means the password was
+     * replaced. When the clip is still readable and matches [expectedSha256] (e.g. Android
+     * TextClassifier updating clip metadata after copy), it has not been replaced.
+     */
+    fun isReplacedByOther(
+        expectedSha256: ByteArray,
+        clipReadable: Boolean,
+        currentText: String?
+    ): Boolean {
+        if (!clipReadable) return true
+        return !shouldWipe(expectedSha256, clipReadable = true, currentText = currentText)
     }
 }
