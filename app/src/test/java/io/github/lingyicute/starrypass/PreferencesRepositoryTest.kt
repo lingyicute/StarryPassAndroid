@@ -124,4 +124,17 @@ class PreferencesRepositoryTest {
 
         assertEquals(setOf("gamma", "beta"), repo.presetsFlow.first().map { it.code }.toSet())
     }
+
+    @Test
+    fun `autofill matching prefers the most specific saved domain over a newer parent domain`() = runBlocking {
+        val repo = repository()
+        val specific = SitePreset(code = "admin-console", autofillDomain = "admin.example.com")
+        val parent = SitePreset(code = "example", autofillDomain = "example.com")
+        repo.upsertPreset(specific)
+        repo.upsertPreset(parent)
+
+        assertEquals(specific.id, repo.findMatchingPreset("admin.example.com", null)?.id)
+        assertEquals(specific.id, repo.findMatchingPreset("eu.admin.example.com", null)?.id)
+        assertEquals(parent.id, repo.findMatchingPreset("shop.example.com", null)?.id)
+    }
 }
