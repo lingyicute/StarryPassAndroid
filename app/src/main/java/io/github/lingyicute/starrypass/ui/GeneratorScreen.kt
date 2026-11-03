@@ -249,6 +249,7 @@ fun GeneratorScreen(
                             onClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 showMaster = false
+                                counterText = uiState.counter.toString()
                                 onResetAll()
                             },
                             enabled = uiState.master.isNotEmpty() || uiState.code.isNotEmpty()
@@ -539,7 +540,7 @@ fun GeneratorScreen(
                                             OutlinedTextField(
                                                 value = counterText,
                                                 onValueChange = { raw ->
-                                                    val digits = raw.filter { it.isDigit() }.take(4)
+                                                    val digits = raw.filter { it in '0'..'9' }.take(4)
                                                     counterText = digits
                                                     digits.toIntOrNull()?.let { parsed ->
                                                         if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER) {
@@ -687,17 +688,26 @@ fun GeneratorScreen(
                             // Password text or placeholder
                             val pwd = uiState.derivedPassword
                             if (pwd != null) {
-                                SelectionContainer {
+                                val annotated = buildColorizedPassword(
+                                    password = pwd,
+                                    colorize = colorizePassword,
+                                    masked = uiState.maskOutput,
+                                    colorScheme = colorScheme
+                                )
+                                if (uiState.maskOutput) {
                                     Text(
-                                        text = buildColorizedPassword(
-                                            password = pwd,
-                                            colorize = colorizePassword,
-                                            masked = uiState.maskOutput,
-                                            colorScheme = colorScheme
-                                        ),
+                                        text = annotated,
                                         style = PasswordMonoTextStyle,
                                         modifier = Modifier.fillMaxWidth()
                                     )
+                                } else {
+                                    SelectionContainer {
+                                        Text(
+                                            text = annotated,
+                                            style = PasswordMonoTextStyle,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                             } else {
                                 val placeholderText = when {
