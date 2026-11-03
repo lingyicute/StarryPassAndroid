@@ -209,7 +209,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }?.let { return it }
 
             presets.mapNotNull { preset ->
-                val codeDomain = normalizeDomain(preset.code)
+                val codeDomain = normalizeCodeAsDomain(preset.code)
                 if (codeDomain.isNotEmpty() &&
                     (normDomain == codeDomain || (codeDomain.contains('.') && normDomain.endsWith(".$codeDomain")))
                 ) {
@@ -293,14 +293,45 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         )
 
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
+        private val WRAPPER_SCHEME_PREFIX = Regex("^(?:blob|view-source):")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
+        private val IPV6_HOST = Regex("^[0-9a-f:.]+$")
+        private val PORT_DIGITS = Regex("^\\d{1,5}$")
 
         private fun isTwoPartPublicSuffix(secondLevel: String, tld: String): Boolean =
             "$secondLevel.$tld" in MULTI_PART_TLDS ||
                 (tld.length == 2 && secondLevel in GENERIC_SECOND_LEVEL)
 
+        private fun isValidPort(rawPort: String): Boolean {
+            if (rawPort.isEmpty()) return true
+            if (!PORT_DIGITS.matches(rawPort)) return false
+            val port = rawPort.toIntOrNull() ?: return false
+            return port in 1..65535
+        }
+
+        private fun isValidIpv6Literal(host: String): Boolean =
+            host.contains(':') && IPV6_HOST.matches(host)
+
+        private fun normalizeCodeAsDomain(rawCode: String): String {
+            val trimmed = Spv2Spec.ecmaTrim(rawCode).lowercase()
+            if (trimmed.isEmpty()) return ""
+            // A scheme-less site code containing '/', '\', '?', '#', or '@' (e.g. `github.com/token`
+            // or `alice@example.com`) is a purpose-qualified code, not a bare domain.
+            if (!WRAPPER_SCHEME_PREFIX.containsMatchIn(trimmed) &&
+                !SCHEME_PREFIX.containsMatchIn(trimmed) &&
+                !trimmed.startsWith("//") &&
+                trimmed.indexOfAny(charArrayOf('/', '\\', '?', '#', '@')) >= 0
+            ) {
+                return ""
+            }
+            return normalizeDomain(trimmed)
+        }
+
         fun normalizeDomain(raw: String): String {
             var s = Spv2Spec.ecmaTrim(raw).lowercase()
+            while (WRAPPER_SCHEME_PREFIX.containsMatchIn(s)) {
+                s = Spv2Spec.ecmaTrim(s.replaceFirst(WRAPPER_SCHEME_PREFIX, ""))
+            }
             s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
             val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
@@ -310,16 +341,26 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 val close = s.indexOf(']')
                 if (close <= 1) return ""
                 val host = Spv2Spec.ecmaTrim(s.substring(1, close))
-                if (host.isEmpty()) return ""
+                val remainder = Spv2Spec.ecmaTrim(s.substring(close + 1))
+                if (!isValidIpv6Literal(host)) return ""
+                if (remainder.isNotEmpty()) {
+                    if (!remainder.startsWith(":") || !isValidPort(Spv2Spec.ecmaTrim(remainder.substring(1)))) {
+                        return ""
+                    }
+                }
                 s = "[$host]"
             } else {
                 val firstColon = s.indexOf(':')
                 if (firstColon >= 0) {
-                    s = if (firstColon != s.lastIndexOf(':')) {
+                    if (firstColon != s.lastIndexOf(':')) {
                         // Unbracketed IPv6 literal (e.g. `2001:db8::1` or `::1`): canonicalise with brackets.
-                        "[$s]"
+                        val host = Spv2Spec.ecmaTrim(s)
+                        if (!isValidIpv6Literal(host)) return ""
+                        s = "[$host]"
                     } else {
-                        Spv2Spec.ecmaTrim(s.substring(0, firstColon))
+                        val portPart = Spv2Spec.ecmaTrim(s.substring(firstColon + 1))
+                        if (!isValidPort(portPart)) return ""
+                        s = Spv2Spec.ecmaTrim(s.substring(0, firstColon))
                     }
                 }
             }
