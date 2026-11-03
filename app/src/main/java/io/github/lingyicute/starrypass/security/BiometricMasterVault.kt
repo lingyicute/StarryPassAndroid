@@ -22,6 +22,8 @@ import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,11 +144,21 @@ class BiometricMasterVault(
 
             val executor = ContextCompat.getMainExecutor(activity)
             lateinit var authPrompt: BiometricPrompt
+            val destroyObserver = object : DefaultLifecycleObserver {
+                override fun onDestroy(lifecycleOwner: LifecycleOwner) {
+                    activity.lifecycle.removeObserver(this)
+                    if (activePrompts.remove(authPrompt) != null) {
+                        pendingMaster = null
+                        finishEnrollment(discardKey = true)
+                    }
+                }
+            }
             authPrompt = BiometricPrompt(
                 activity,
                 executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        activity.lifecycle.removeObserver(destroyObserver)
                         activePrompts.remove(authPrompt)
                         if (enrollmentOwner !== owner) return
                         val secret = pendingMaster
@@ -186,6 +198,7 @@ class BiometricMasterVault(
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        activity.lifecycle.removeObserver(destroyObserver)
                         activePrompts.remove(authPrompt)
                         pendingMaster = null
                         if (enrollmentOwner !== owner) return
@@ -201,7 +214,9 @@ class BiometricMasterVault(
                 }
             )
             prompt = authPrompt
+            activity.lifecycle.addObserver(destroyObserver)
             activePrompts[authPrompt] = {
+                activity.lifecycle.removeObserver(destroyObserver)
                 pendingMaster = null
                 finishEnrollment(discardKey = true)
             }
@@ -254,11 +269,18 @@ class BiometricMasterVault(
 
             val executor = ContextCompat.getMainExecutor(activity)
             lateinit var authPrompt: BiometricPrompt
+            val destroyObserver = object : DefaultLifecycleObserver {
+                override fun onDestroy(lifecycleOwner: LifecycleOwner) {
+                    activity.lifecycle.removeObserver(this)
+                    activePrompts.remove(authPrompt)
+                }
+            }
             authPrompt = BiometricPrompt(
                 activity,
                 executor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        activity.lifecycle.removeObserver(destroyObserver)
                         if (activePrompts.remove(authPrompt) == null || !sessionWipes.isCurrent(generation)) return
                         val unlockedCipher = result.cryptoObject?.cipher
                         if (unlockedCipher == null) {
@@ -281,6 +303,7 @@ class BiometricMasterVault(
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        activity.lifecycle.removeObserver(destroyObserver)
                         if (activePrompts.remove(authPrompt) == null) return
                         if (sessionWipes.isCurrent(generation) &&
                             errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
@@ -293,7 +316,10 @@ class BiometricMasterVault(
                 }
             )
             prompt = authPrompt
-            activePrompts[authPrompt] = { }
+            activity.lifecycle.addObserver(destroyObserver)
+            activePrompts[authPrompt] = {
+                activity.lifecycle.removeObserver(destroyObserver)
+            }
             authPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: KeyPermanentlyInvalidatedException) {
             prompt?.let { activePrompts.remove(it) }

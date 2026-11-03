@@ -483,6 +483,12 @@ private fun BiometricEnrollDialog(
     var master by remember { mutableStateOf(initialMaster) }
     var visible by remember { mutableStateOf(false) }
 
+    LaunchedEffect(master.isEmpty()) {
+        if (master.isEmpty()) {
+            visible = false
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.biometric_enroll_dialog_title)) },
