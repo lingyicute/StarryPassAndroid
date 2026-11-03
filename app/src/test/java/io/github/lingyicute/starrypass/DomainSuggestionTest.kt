@@ -49,6 +49,14 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `strips leading dot and wildcard so cookie-style domains still match`() {
+        assertEquals("example.com", PreferencesRepository.normalizeDomain(".example.com"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("*.example.com"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("*.www.Example.com:443"))
+        assertEquals("github", PreferencesRepository.suggestCodeFromContext("*.github.com", null))
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")

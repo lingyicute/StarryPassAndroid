@@ -241,7 +241,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 val colon = s.indexOf(':')
                 if (colon >= 0) s = s.substring(0, colon)
             }
-            s = s.trimEnd('.')
+            // Cookie-style entries (`.example.com`, `*.example.com`) already match by suffix.
+            s = s.removePrefix("*.").trimStart('.').trimEnd('.')
             s = s.removePrefix("www.")
             return s
         }
