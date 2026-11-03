@@ -99,13 +99,13 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (cleanCode.isEmpty()) return
         val normalized = preset.copy(
             code = cleanCode,
-            alias = preset.alias.trim(),
+            alias = Spv2Spec.ecmaTrim(preset.alias),
             modeKey = preset.mode.key,
             length = Spv2Spec.clampLength(preset.length),
             counter = Spv2Spec.clampCounter(preset.counter),
             tierKey = preset.tier.key,
             autofillDomain = normalizeDomain(preset.autofillDomain),
-            autofillPackage = preset.autofillPackage.trim(),
+            autofillPackage = Spv2Spec.ecmaTrim(preset.autofillPackage),
             updatedAtEpochMs = System.currentTimeMillis()
         )
         dataStore.edit { prefs ->
@@ -179,7 +179,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (presets.isEmpty()) return null
 
         val normDomain = webDomain?.let(::normalizeDomain)?.takeIf { it.isNotEmpty() }
-        val normPkg = packageName?.trim()?.takeIf { it.isNotEmpty() }
+        val normPkg = packageName?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() }
 
         if (normDomain != null) {
             // The most specific domain wins; recency (list order) only breaks ties.
@@ -192,7 +192,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
         if (normPkg != null) {
             presets.firstOrNull { preset ->
-                val pkg = preset.autofillPackage.trim()
+                val pkg = Spv2Spec.ecmaTrim(preset.autofillPackage)
                 pkg.isNotEmpty() && pkg.equals(normPkg, ignoreCase = true)
             }?.let { return it }
         }
@@ -201,6 +201,15 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             presets.firstOrNull { preset ->
                 preset.code.equals(normDomain, ignoreCase = true)
             }?.let { return it }
+
+            presets.mapNotNull { preset ->
+                val codeDomain = normalizeDomain(preset.code)
+                if (codeDomain.contains('.') && (normDomain == codeDomain || normDomain.endsWith(".$codeDomain"))) {
+                    preset to codeDomain
+                } else {
+                    null
+                }
+            }.maxByOrNull { (_, codeDomain) -> codeDomain.length }?.let { return it.first }
 
             val domainStem = extractDomainStem(normDomain)
             if (domainStem.isNotEmpty()) {
@@ -238,18 +247,18 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }.getOrNull() ?: return@mapNotNull null
             val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
             if (cleanCode.isEmpty()) return@mapNotNull null
-            val cleanId = decoded.id.trim().ifEmpty { UUID.randomUUID().toString() }
+            val cleanId = Spv2Spec.ecmaTrim(decoded.id).ifEmpty { UUID.randomUUID().toString() }
             if (!seenIds.add(cleanId) || !seenCodes.add(cleanCode)) return@mapNotNull null
             decoded.copy(
                 id = cleanId,
                 code = cleanCode,
-                alias = decoded.alias.trim(),
+                alias = Spv2Spec.ecmaTrim(decoded.alias),
                 modeKey = decoded.mode.key,
                 length = Spv2Spec.clampLength(decoded.length),
                 counter = Spv2Spec.clampCounter(decoded.counter),
                 tierKey = decoded.tier.key,
                 autofillDomain = normalizeDomain(decoded.autofillDomain),
-                autofillPackage = decoded.autofillPackage.trim()
+                autofillPackage = Spv2Spec.ecmaTrim(decoded.autofillPackage)
             )
         }
     }
@@ -285,11 +294,14 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
             val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
-            s = s.substringAfterLast('@')
+            s = Spv2Spec.ecmaTrim(s.substringAfterLast('@'))
             if (s.startsWith("[")) {
                 // IPv6 literal: its colons are part of the host, only a port may follow the bracket.
                 val close = s.indexOf(']')
-                if (close >= 0) s = s.substring(0, close + 1)
+                if (close <= 1) return ""
+                val host = Spv2Spec.ecmaTrim(s.substring(1, close))
+                if (host.isEmpty()) return ""
+                s = "[$host]"
             } else {
                 val firstColon = s.indexOf(':')
                 if (firstColon >= 0) {
@@ -297,7 +309,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                         // Unbracketed IPv6 literal (e.g. `2001:db8::1` or `::1`): canonicalise with brackets.
                         "[$s]"
                     } else {
-                        s.substring(0, firstColon)
+                        Spv2Spec.ecmaTrim(s.substring(0, firstColon))
                     }
                 }
             }

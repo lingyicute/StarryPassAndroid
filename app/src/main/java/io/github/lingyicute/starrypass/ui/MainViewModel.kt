@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -100,8 +101,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             master = "",
                             derivedPassword = null,
                             isDeriving = false,
+                            lastCached = false,
+                            lastElapsedMs = 0L,
                             errorCode = null,
-                            strength = StrengthEstimate(0, 0, StrengthReason.EMPTY)
+                            strength = StrengthEstimate(0, 0, StrengthReason.EMPTY),
+                            maskOutput = false
                         )
                     }
                 }
@@ -122,6 +126,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetAll() {
+        biometricVault.cancelPendingAuthentication()
         derivation.cancel()
         _uiState.update {
             it.copy(
@@ -129,8 +134,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 code = "",
                 derivedPassword = null,
                 isDeriving = false,
+                lastCached = false,
+                lastElapsedMs = 0L,
                 errorCode = null,
-                strength = StrengthEstimate(0, 0, StrengthReason.EMPTY)
+                strength = StrengthEstimate(0, 0, StrengthReason.EMPTY),
+                maskOutput = false
             )
         }
         viewModelScope.launch {
@@ -206,7 +214,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun upsertPreset(preset: SitePreset) {
         val cleanCode = Spv2Spec.ecmaTrim(preset.code)
         if (cleanCode.isEmpty()) return
-        if (Spv2Spec.ecmaTrim(_uiState.value.code) == cleanCode) {
+        fun syncGeneratorPolicy() {
             derivation.updateInputs(debounceMs = 0L) {
                 it.copy(
                     code = cleanCode,
@@ -217,7 +225,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-        viewModelScope.launch { prefsRepo.upsertPreset(preset) }
+        val previousCode = presetsState.value.firstOrNull { it.id == preset.id }?.code
+        val activeCode = Spv2Spec.ecmaTrim(_uiState.value.code)
+        val synced = activeCode == cleanCode || (previousCode != null && activeCode == previousCode)
+        if (synced) {
+            syncGeneratorPolicy()
+        }
+        viewModelScope.launch {
+            if (!synced) {
+                val storedCode = prefsRepo.presetsFlow.first().firstOrNull { it.id == preset.id }?.code
+                if (storedCode != null && Spv2Spec.ecmaTrim(_uiState.value.code) == storedCode) {
+                    syncGeneratorPolicy()
+                }
+            }
+            prefsRepo.upsertPreset(preset)
+        }
     }
 
     fun deletePreset(id: String) {
