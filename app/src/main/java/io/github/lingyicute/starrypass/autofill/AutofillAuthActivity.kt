@@ -13,7 +13,6 @@ import android.os.Bundle
 import android.service.autofill.Dataset
 import android.service.autofill.Field
 import android.service.autofill.Presentations
-import android.view.WindowManager
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
@@ -116,6 +115,7 @@ import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.Spv2Tier
 import io.github.lingyicute.starrypass.data.AppSettings
+import io.github.lingyicute.starrypass.security.ScreenSecurityEffect
 import io.github.lingyicute.starrypass.ui.modeLabelText
 import io.github.lingyicute.starrypass.ui.theme.StarryPassTheme
 import io.github.lingyicute.starrypass.ui.tierShortLabelText
@@ -190,11 +190,7 @@ class AutofillAuthActivity : FragmentActivity() {
             val scope = rememberCoroutineScope()
 
             // Respect user's screenshot protection setting inside Autofill sheet as well
-            if (settings.flagSecure) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            } else {
-                window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            }
+            ScreenSecurityEffect(flagSecureEnabled = settings.flagSecure)
 
             BackHandler { cancelAutofill() }
 
@@ -387,9 +383,9 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 selected = selected,
                                                 onClick = {
                                                     code = preset.code
-                                                    length = preset.length
+                                                    length = Spv2Spec.clampLength(preset.length)
                                                     mode = preset.mode
-                                                    counter = preset.counter
+                                                    counter = Spv2Spec.clampCounter(preset.counter)
                                                     tier = preset.tier
                                                 },
                                                 label = {
@@ -762,6 +758,11 @@ class AutofillAuthActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (application as? StarryPassApp)?.biometricVault?.refreshState()
     }
 
     private fun cancelAutofill() {
