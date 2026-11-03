@@ -96,4 +96,30 @@ class Spv2CancellationTest {
             }
         }
     }
+
+    @Test
+    fun `cancelled cache hit after a committed derivation preserves the session cache`() = runBlocking {
+        workerDispatcher().use { dispatcher ->
+            val engine = Spv2Engine(dispatcher)
+            engine.runSelfTest()
+            val scheduler = TestCoroutineScheduler()
+            val caller = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler))
+            try {
+                val initial = DeriveRequest("a private master", "example", length = 16)
+                assertFalse(engine.derive(initial).cached)
+
+                val cachedFollowUp = initial.copy(length = 20)
+                val pending = caller.async { engine.derive(cachedFollowUp) }
+                scheduler.runCurrent()
+                awaitWorkerIdle()
+                pending.cancel()
+                scheduler.advanceUntilIdle()
+                assertTrue(pending.isCompleted)
+
+                assertTrue(engine.derive(initial.copy(length = 24)).cached)
+            } finally {
+                caller.cancel()
+            }
+        }
+    }
 }
