@@ -148,6 +148,10 @@ internal object Spv2Primitives {
         fun dispose() {
             Spv2Spec.zeroize(blockBuf)
             pos = blockBuf.size
+            runCatching {
+                val zero = ByteArray(Spv2Spec.HKDF_BLOCK_BYTES)
+                hkdf.init(HKDFParameters(zero, zero, ByteArray(0)))
+            }
         }
     }
 }
