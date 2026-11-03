@@ -322,6 +322,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val WRAPPER_SCHEME_PREFIX = Regex("^(?:blob|view-source):")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
+        // Opaque URIs carry no network host; without this, `tel:12345` reads as host:port and
+        // `mailto:a@evil.com` as the host `evil.com`.
+        private val NON_NETWORK_URI = Regex(
+            "^(?:mailto|tel|sms|smsto|geo|urn|javascript|about):"
+        )
         private val IPV6_HOST = Regex("^[0-9a-f:.]+$")
         private val PORT_DIGITS = Regex("^\\d{1,5}$")
 
@@ -359,6 +364,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             while (WRAPPER_SCHEME_PREFIX.containsMatchIn(s)) {
                 s = Spv2Spec.ecmaTrim(s.replaceFirst(WRAPPER_SCHEME_PREFIX, ""))
             }
+            if (NON_NETWORK_URI.containsMatchIn(s)) return ""
             s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
             val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
