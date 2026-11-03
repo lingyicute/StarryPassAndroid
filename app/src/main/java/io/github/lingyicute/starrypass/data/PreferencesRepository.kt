@@ -8,13 +8,14 @@ package io.github.lingyicute.starrypass.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -22,17 +23,40 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import java.io.File
 import java.util.UUID
 
-private val Context.starryPassDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "starrypass_preferences",
-    // A damaged file must not crash every collector, including the background wipe observer.
-    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
-)
+private const val DATASTORE_NAME = "starrypass_preferences"
+
+@Volatile private var sharedDataStore: DataStore<Preferences>? = null
+
+private fun Context.starryPassDataStore(): DataStore<Preferences> {
+    sharedDataStore?.let { return it }
+    return synchronized(DATASTORE_NAME) {
+        sharedDataStore ?: run {
+            val appContext = applicationContext
+            PreferenceDataStoreFactory.create(
+                // A damaged file must not crash every collector, including the background wipe
+                // observer. Presets and rotation counters live in it, so keep the damaged bytes.
+                corruptionHandler = ReplaceFileCorruptionHandler {
+                    backupCorruptedFile(appContext.preferencesDataStoreFile(DATASTORE_NAME))
+                    emptyPreferences()
+                },
+                produceFile = { appContext.preferencesDataStoreFile(DATASTORE_NAME) }
+            ).also { sharedDataStore = it }
+        }
+    }
+}
+
+private fun backupCorruptedFile(file: File) {
+    runCatching {
+        if (file.exists()) file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+    }
+}
 
 class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
-    constructor(context: Context) : this(context.starryPassDataStore)
+    constructor(context: Context) : this(context.starryPassDataStore())
 
     private val json = Json {
         ignoreUnknownKeys = true
