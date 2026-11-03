@@ -327,12 +327,14 @@ fun GeneratorScreen(
                         trailingIcon = {
                             if (uiState.code.isNotEmpty()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = onSaveCurrentAsPreset) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.BookmarkAdd,
-                                            contentDescription = stringResource(R.string.action_save_as_preset),
-                                            tint = colorScheme.primary
-                                        )
+                                    if (Spv2Spec.ecmaTrim(uiState.code).isNotEmpty()) {
+                                        IconButton(onClick = onSaveCurrentAsPreset) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.BookmarkAdd,
+                                                contentDescription = stringResource(R.string.action_save_as_preset),
+                                                tint = colorScheme.primary
+                                            )
+                                        }
                                     }
                                     IconButton(onClick = onClearCode) {
                                         Icon(
@@ -371,7 +373,10 @@ fun GeneratorScreen(
                                     uiState.tier == preset.tier
                                 FilterChip(
                                     selected = selected,
-                                    onClick = { onApplyPreset(preset) },
+                                    onClick = {
+                                        counterText = Spv2Spec.clampCounter(preset.counter).toString()
+                                        onApplyPreset(preset)
+                                    },
                                     label = {
                                         Text(
                                             if (preset.counter > 1) {
@@ -547,6 +552,12 @@ fun GeneratorScreen(
                                                 keyboardOptions = KeyboardOptions(
                                                     keyboardType = KeyboardType.Number,
                                                     imeAction = ImeAction.Done
+                                                ),
+                                                keyboardActions = KeyboardActions(
+                                                    onDone = {
+                                                        counterText = uiState.counter.toString()
+                                                        focusManager.clearFocus()
+                                                    }
                                                 ),
                                                 modifier = Modifier
                                                     .width(96.dp)

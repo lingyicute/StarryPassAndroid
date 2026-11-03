@@ -107,7 +107,7 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_existing_vault))
             return
         }
-        if (enrollmentOwner != null) {
+        if (enrollmentOwner != null || activePrompts.isNotEmpty()) {
             onError(activity.getString(R.string.biometric_err_auth_in_progress))
             return
         }
@@ -222,7 +222,7 @@ class BiometricMasterVault(
             }
             authPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (e: Exception) {
-            prompt?.let { activePrompts.remove(it) }
+            prompt?.let { activePrompts.remove(it)?.invoke() }
             pendingMaster = null
             finishEnrollment(discardKey = true)
             if (sessionWipes.isCurrent(generation)) {
@@ -249,6 +249,9 @@ class BiometricMasterVault(
         if (key == null || !isHardwareBacked(key)) {
             // Preserve the existing ciphertext and key for explicit user revocation.
             onError(activity.getString(R.string.biometric_err_hardware_unverified))
+            return
+        }
+        if (enrollmentOwner != null || activePrompts.isNotEmpty()) {
             return
         }
 
@@ -322,12 +325,12 @@ class BiometricMasterVault(
             }
             authPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: KeyPermanentlyInvalidatedException) {
-            prompt?.let { activePrompts.remove(it) }
+            prompt?.let { activePrompts.remove(it)?.invoke() }
             if (sessionWipes.isCurrent(generation)) {
                 onError(activity.getString(R.string.biometric_err_key_invalidated))
             }
         } catch (e: Exception) {
-            prompt?.let { activePrompts.remove(it) }
+            prompt?.let { activePrompts.remove(it)?.invoke() }
             if (sessionWipes.isCurrent(generation)) {
                 onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
             }
