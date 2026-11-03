@@ -111,6 +111,9 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_auth_in_progress))
             return
         }
+        if (activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved) {
+            return
+        }
 
         val owner = Any()
         enrollmentOwner = owner
@@ -150,6 +153,7 @@ class BiometricMasterVault(
                     if (activePrompts.remove(authPrompt) != null) {
                         pendingMaster = null
                         finishEnrollment(discardKey = true)
+                        runCatching { authPrompt.cancelAuthentication() }
                     }
                 }
             }
@@ -191,7 +195,10 @@ class BiometricMasterVault(
                             onSuccess()
                         } catch (e: Exception) {
                             finishEnrollment(discardKey = true)
-                            onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                            onError(
+                                e.localizedMessage?.takeIf { it.isNotBlank() }
+                                    ?: activity.getString(R.string.biometric_err_cipher)
+                            )
                         } finally {
                             Spv2Spec.zeroize(plainBytes)
                         }
@@ -226,7 +233,10 @@ class BiometricMasterVault(
             pendingMaster = null
             finishEnrollment(discardKey = true)
             if (sessionWipes.isCurrent(generation)) {
-                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                onError(
+                    e.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: activity.getString(R.string.biometric_err_cipher)
+                )
             }
         }
     }
@@ -251,7 +261,9 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_hardware_unverified))
             return
         }
-        if (enrollmentOwner != null || activePrompts.isNotEmpty()) {
+        if (enrollmentOwner != null || activePrompts.isNotEmpty() ||
+            activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved
+        ) {
             return
         }
 
@@ -275,7 +287,9 @@ class BiometricMasterVault(
             val destroyObserver = object : DefaultLifecycleObserver {
                 override fun onDestroy(lifecycleOwner: LifecycleOwner) {
                     activity.lifecycle.removeObserver(this)
-                    activePrompts.remove(authPrompt)
+                    if (activePrompts.remove(authPrompt) != null) {
+                        runCatching { authPrompt.cancelAuthentication() }
+                    }
                 }
             }
             authPrompt = BiometricPrompt(
@@ -296,9 +310,16 @@ class BiometricMasterVault(
                             if (sessionWipes.isCurrent(generation)) {
                                 onSuccess(String(plainBytes, Charsets.UTF_8))
                             }
+                        } catch (_: KeyPermanentlyInvalidatedException) {
+                            if (sessionWipes.isCurrent(generation)) {
+                                onError(activity.getString(R.string.biometric_err_key_invalidated))
+                            }
                         } catch (e: Exception) {
                             if (sessionWipes.isCurrent(generation)) {
-                                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                                onError(
+                                    e.localizedMessage?.takeIf { it.isNotBlank() }
+                                        ?: activity.getString(R.string.biometric_err_cipher)
+                                )
                             }
                         } finally {
                             Spv2Spec.zeroize(plainBytes)
@@ -332,7 +353,10 @@ class BiometricMasterVault(
         } catch (e: Exception) {
             prompt?.let { activePrompts.remove(it)?.invoke() }
             if (sessionWipes.isCurrent(generation)) {
-                onError(e.localizedMessage ?: activity.getString(R.string.biometric_err_cipher))
+                onError(
+                    e.localizedMessage?.takeIf { it.isNotBlank() }
+                        ?: activity.getString(R.string.biometric_err_cipher)
+                )
             }
         }
     }

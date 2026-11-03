@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,6 +65,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.data.PresetRotationResult
@@ -83,11 +87,23 @@ fun StarryPassRootScreen(
     val biometricEnrolled by viewModel.biometricEnrolledState.collectAsState()
     val clipboardCountdown by viewModel.clipboardCountdownState.collectAsState()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Re-queried on resume: users may enroll a fingerprint in system settings and come back.
     var biometricHardwareStatus by remember { mutableStateOf(viewModel.queryBiometricHardware()) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.biometricVault.refreshState()
+                biometricHardwareStatus = viewModel.queryBiometricHardware()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     ScreenSecurityEffect(flagSecureEnabled = settings.flagSecure)
 
