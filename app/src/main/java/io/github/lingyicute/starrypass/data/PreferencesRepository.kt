@@ -109,9 +109,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         )
         dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
-            val idx = current.indexOfFirst {
-                it.id == normalized.id || it.code == normalized.code
-            }
+            val idIdx = current.indexOfFirst { it.id == normalized.id }
+            val codeIdx = current.indexOfFirst { it.code == normalized.code }
+            // An edit keeps its own entry; renaming onto another code replaces that entry.
+            val idx = if (idIdx >= 0) idIdx else codeIdx
             if (idx >= 0) {
                 current[idx] = if (policyOnly) {
                     current[idx].copy(
@@ -124,6 +125,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 } else {
                     normalized.copy(id = current[idx].id)
                 }
+                if (!policyOnly && codeIdx >= 0 && codeIdx != idx) current.removeAt(codeIdx)
             } else {
                 current.add(0, normalized)
             }
