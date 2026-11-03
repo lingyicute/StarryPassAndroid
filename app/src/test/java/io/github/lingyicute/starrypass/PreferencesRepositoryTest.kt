@@ -95,4 +95,33 @@ class PreferencesRepositoryTest {
         assertEquals("new.example", saved.autofillDomain)
         assertEquals(initial.id, saved.id)
     }
+
+    @Test
+    fun `renaming a preset onto an existing code replaces that entry instead of duplicating it`() = runBlocking {
+        val repo = repository()
+        val first = SitePreset(code = "alpha", alias = "A")
+        val second = SitePreset(code = "beta", alias = "B")
+        repo.upsertPreset(first)
+        repo.upsertPreset(second)
+
+        repo.upsertPreset(second.copy(code = "alpha"))
+
+        val saved = repo.presetsFlow.first().single()
+        assertEquals(second.id, saved.id)
+        assertEquals("alpha", saved.code)
+        assertEquals("B", saved.alias)
+    }
+
+    @Test
+    fun `renaming a preset to a free code keeps the other presets`() = runBlocking {
+        val repo = repository()
+        val first = SitePreset(code = "alpha")
+        val second = SitePreset(code = "beta")
+        repo.upsertPreset(first)
+        repo.upsertPreset(second)
+
+        repo.upsertPreset(first.copy(code = "gamma"))
+
+        assertEquals(setOf("gamma", "beta"), repo.presetsFlow.first().map { it.code }.toSet())
+    }
 }
