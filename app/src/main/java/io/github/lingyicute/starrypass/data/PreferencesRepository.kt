@@ -7,9 +7,11 @@ package io.github.lingyicute.starrypass.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -21,7 +23,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val Context.starryPassDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "starrypass_preferences"
+    name = "starrypass_preferences",
+    // A damaged file must not crash every collector, including the background wipe observer.
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
 )
 
 class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
