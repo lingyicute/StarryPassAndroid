@@ -224,6 +224,7 @@ class AutofillAuthActivity : FragmentActivity() {
                         observedWipe = generation
                         deriveJob?.cancel()
                         deriveJob = null
+                        app.biometricVault.cancelPendingAuthentication()
                         master = ""
                         showMaster = false
                         busy = false
@@ -235,6 +236,7 @@ class AutofillAuthActivity : FragmentActivity() {
             fun cancelInFlightDerive() {
                 deriveJob?.cancel()
                 deriveJob = null
+                app.biometricVault.cancelPendingAuthentication()
                 busy = false
                 errorMsg = null
             }
@@ -276,6 +278,9 @@ class AutofillAuthActivity : FragmentActivity() {
                                 autoClearSeconds = settings.clipboardAutoClearSeconds
                             )
                             if (copied) {
+                                master = ""
+                                showMaster = false
+                                busy = false
                                 cancelAutofill()
                             } else {
                                 // Keep the sheet open so the user is not left with nothing copied.
@@ -283,6 +288,9 @@ class AutofillAuthActivity : FragmentActivity() {
                                 errorMsg = getString(R.string.clipboard_copy_failed)
                             }
                         } else {
+                            master = ""
+                            showMaster = false
+                            busy = false
                             completeAutofill(targetIds, cleanCode, res.password)
                         }
                     } catch (cancelled: CancellationException) {

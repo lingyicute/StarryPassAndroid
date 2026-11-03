@@ -75,6 +75,7 @@ import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.Spv2Tier
+import io.github.lingyicute.starrypass.data.PreferencesRepository
 import io.github.lingyicute.starrypass.data.SitePreset
 import kotlin.math.roundToInt
 
@@ -425,7 +426,7 @@ private fun PresetEditDialog(
                     OutlinedTextField(
                         value = counterText,
                         onValueChange = { raw ->
-                            val digits = raw.filter(Char::isDigit).take(4)
+                            val digits = raw.filter { it in '0'..'9' }.take(4)
                             counterText = digits
                             digits.toIntOrNull()?.let { parsed ->
                                 if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER) {
@@ -504,7 +505,7 @@ private fun PresetEditDialog(
                         modeKey = mode.key,
                         counter = ctr,
                         tierKey = tier.key,
-                        autofillDomain = Spv2Spec.ecmaTrim(domain),
+                        autofillDomain = PreferencesRepository.normalizeDomain(domain),
                         autofillPackage = Spv2Spec.ecmaTrim(pkg)
                     )
                     onConfirm(result)
