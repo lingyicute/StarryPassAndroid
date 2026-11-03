@@ -6,6 +6,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
 class DomainSuggestionTest {
@@ -68,11 +69,27 @@ class DomainSuggestionTest {
         assertEquals("", PreferencesRepository.normalizeDomain("[::1]:notaport"))
         assertEquals("", PreferencesRepository.normalizeDomain("tel:12345"))
         assertEquals("", PreferencesRepository.normalizeDomain("mailto:a@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("cid:part1@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("content://com.android.providers.downloads/document/1"))
+        assertEquals("", PreferencesRepository.normalizeDomain("file://localhost/sdcard/login.html"))
+        assertEquals("", PreferencesRepository.normalizeDomain("intent://scan/#Intent;scheme=zxing;end"))
         assertEquals("", PreferencesRepository.normalizeDomain("data:text/html,x"))
+        assertEquals("", PreferencesRepository.normalizeDomain("https://www./login"))
+        assertEquals("", PreferencesRepository.normalizeDomain("example..com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("bad host.com"))
         assertEquals("", PreferencesRepository.normalizeDomain("[not-an-ipv6]"))
         assertEquals("chrome", PreferencesRepository.suggestCodeFromContext("about:blank", "com.android.chrome"))
         assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("::ffff:192.168.1.1"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, " com.github.android "))
+
+        val prevLocale = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+            assertEquals("github.com", PreferencesRepository.normalizeDomain("HTTPS://GITHUB.COM/LOGIN"))
+            assertEquals("github", PreferencesRepository.suggestCodeFromContext("HTTPS://GITHUB.COM", "COM.GITHUB.ANDROID"))
+        } finally {
+            Locale.setDefault(prevLocale)
+        }
     }
 
     @Test

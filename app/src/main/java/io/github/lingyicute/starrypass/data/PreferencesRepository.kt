@@ -24,6 +24,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 
 private const val DATASTORE_NAME = "starrypass_preferences"
@@ -138,8 +139,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
             val idIdx = current.indexOfFirst { it.id == normalized.id }
             val codeIdx = current.indexOfFirst { it.code == normalized.code }
-            // An edit keeps its own entry; renaming onto another code replaces that entry.
-            val idx = if (idIdx >= 0) idIdx else codeIdx
+            // Quick policy save always targets the site code; full editor keeps its own entry and replaces on rename.
+            val idx = if (policyOnly) codeIdx else if (idIdx >= 0) idIdx else codeIdx
             if (idx >= 0) {
                 current[idx] = if (policyOnly) {
                     current[idx].copy(
@@ -322,10 +323,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val WRAPPER_SCHEME_PREFIX = Regex("^(?:blob|view-source):")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
-        // Opaque URIs carry no network host; without this, `tel:12345` reads as host:port and
-        // `mailto:a@evil.com` as the host `evil.com`.
+        // Opaque and local/non-network URIs carry no network host; without this, `tel:12345` reads as
+        // host:port, `mailto:a@evil.com` / `cid:x@evil.com` as `evil.com`, and `content://` as a host.
         private val NON_NETWORK_URI = Regex(
-            "^(?:mailto|tel|sms|smsto|geo|urn|javascript|about):"
+            "^(?:mailto|tel|sms|smsto|mms|mmsto|voicemail|cid|mid|geo|urn|javascript|about|data|file|content|intent|market|android-app):"
         )
         private val IPV6_HOST = Regex("^[0-9a-f:.]+$")
         private val PORT_DIGITS = Regex("^\\d{1,5}$")
@@ -345,7 +346,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             host.contains(':') && IPV6_HOST.matches(host)
 
         private fun normalizeCodeAsDomain(rawCode: String): String {
-            val trimmed = Spv2Spec.ecmaTrim(rawCode).lowercase()
+            val trimmed = Spv2Spec.ecmaTrim(rawCode).lowercase(Locale.ROOT)
             if (trimmed.isEmpty()) return ""
             // A scheme-less site code containing '/', '\', '?', '#', or '@' (e.g. `github.com/token`
             // or `alice@example.com`) is a purpose-qualified code, not a bare domain.
@@ -360,7 +361,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
 
         fun normalizeDomain(raw: String): String {
-            var s = Spv2Spec.ecmaTrim(raw).lowercase()
+            var s = Spv2Spec.ecmaTrim(raw).lowercase(Locale.ROOT)
             while (WRAPPER_SCHEME_PREFIX.containsMatchIn(s)) {
                 s = Spv2Spec.ecmaTrim(s.replaceFirst(WRAPPER_SCHEME_PREFIX, ""))
             }
@@ -401,8 +402,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             while (s.startsWith(".") || s.startsWith("*.")) {
                 s = s.removePrefix("*.").trimStart('.')
             }
+            if (s == "www." || s.startsWith("www..")) return ""
             s = s.trimEnd('.')
-            if (s == "*") return ""
+            if (s.isEmpty() || s == "*" || (!s.startsWith("[") && s.contains(".."))) return ""
+            if (s.any { it <= ' ' || Spv2Spec.ecmaTrim(it.toString()).isEmpty() }) return ""
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
                 val parts = withoutWww.split('.').filter { it.isNotEmpty() }
@@ -423,7 +426,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (stem.isNotEmpty()) return stem
             }
             if (!packageName.isNullOrBlank()) {
-                val rawParts = Spv2Spec.ecmaTrim(packageName).lowercase().split('.').filter { it.isNotEmpty() }
+                val rawParts = Spv2Spec.ecmaTrim(packageName).lowercase(Locale.ROOT).split('.').filter { it.isNotEmpty() }
                 val meaningful = rawParts
                     .drop(if (rawParts.size >= 2) 1 else 0) // drop leading TLD (com, org, ch, de, io, jp, ...)
                     .filterNot {
