@@ -16,6 +16,9 @@ class DomainSuggestionTest {
         assertEquals("github", PreferencesRepository.suggestCodeFromContext("accounts.github.com", null))
         assertEquals("bbc", PreferencesRepository.suggestCodeFromContext("id.bbc.co.uk", null))
         assertEquals("bilibili", PreferencesRepository.suggestCodeFromContext("passport.bilibili.com.cn", null))
+        assertEquals("amazon", PreferencesRepository.suggestCodeFromContext("www.amazon.com.au", null))
+        assertEquals("naver", PreferencesRepository.suggestCodeFromContext("nid.naver.co.kr", null))
+        assertEquals("mercadolivre", PreferencesRepository.suggestCodeFromContext("login.mercadolivre.com.br", null))
         assertEquals("protonmail", PreferencesRepository.suggestCodeFromContext(null, "ch.protonmail.android"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, "com.github.android"))
     }
