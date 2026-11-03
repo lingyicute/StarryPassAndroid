@@ -1,8 +1,10 @@
 package io.github.lingyicute.starrypass
 
+import io.github.lingyicute.starrypass.autofill.AssistStructureParser
 import io.github.lingyicute.starrypass.data.PreferencesRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -78,6 +80,18 @@ class DomainSuggestionTest {
         assertEquals("", PreferencesRepository.normalizeDomain("example..com"))
         assertEquals("", PreferencesRepository.normalizeDomain("bad host.com"))
         assertEquals("", PreferencesRepository.normalizeDomain("[not-an-ipv6]"))
+        assertEquals("", PreferencesRepository.normalizeDomain("127.0.0.1:80:80"))
+        assertEquals("", PreferencesRepository.normalizeDomain("cafe.de:80:80"))
+        assertEquals("", PreferencesRepository.normalizeDomain(":::"))
+        assertEquals("", PreferencesRepository.normalizeDomain("1:2"))
+        assertEquals("", PreferencesRepository.normalizeDomain("example.com:"))
+        assertEquals("", PreferencesRepository.normalizeDomain("[::1]:"))
+        assertEquals("", PreferencesRepository.normalizeDomain("http:"))
+        assertEquals("", PreferencesRepository.normalizeDomain("magnet:?xt=urn:btih:123"))
+        assertEquals("", PreferencesRepository.normalizeDomain("example[1].com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("-example.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("example-.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("999.999.999.999"))
         assertEquals("chrome", PreferencesRepository.suggestCodeFromContext("about:blank", "com.android.chrome"))
         assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("::ffff:192.168.1.1"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, " com.github.android "))
@@ -111,6 +125,16 @@ class DomainSuggestionTest {
         assertEquals("www", PreferencesRepository.extractDomainStem("https://www.com"))
         assertEquals("www", PreferencesRepository.extractDomainStem("https://www.co.uk"))
         assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("http://[::ffff:192.168.1.1]:8080/login"))
+    }
+
+    @Test
+    fun `autofill node domain resolver rejects non-network webScheme and normalizes valid domains`() {
+        assertEquals("github.com", AssistStructureParser.resolveNodeDomain("www.github.com", "https"))
+        assertEquals("github.com", AssistStructureParser.resolveNodeDomain("https://WWW.GitHub.com:443/login", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("localhost", "file"))
+        assertNull(AssistStructureParser.resolveNodeDomain("com.android.providers.downloads", "content"))
+        assertNull(AssistStructureParser.resolveNodeDomain("blank", "about"))
+        assertNull(AssistStructureParser.resolveNodeDomain("void(0)", "javascript"))
     }
 
     @Test

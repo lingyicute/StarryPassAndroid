@@ -6,6 +6,7 @@
 package io.github.lingyicute.starrypass.autofill
 
 import android.app.assist.AssistStructure
+import android.os.Build
 import android.text.InputType
 import android.view.View
 import android.view.autofill.AutofillId
@@ -67,6 +68,7 @@ internal object AssistStructureParser {
     private val NON_PASSWORD_HTML_TYPES = setOf(
         "email",
         "search",
+        "tel",
         "url"
     )
 
@@ -106,6 +108,7 @@ internal object AssistStructureParser {
         var detectedDomain: String? = null
         val pkgName = structure.activityComponent?.packageName
 
+        var focusedPasswordDomain: String? = null
         var focusedDomain: String? = null
         var passwordDomain: String? = null
 
@@ -122,8 +125,9 @@ internal object AssistStructureParser {
                     }
                 },
                 onPasswordDomain = { dom, isFocused ->
-                    if (dom != null && (passwordDomain == null || isFocused)) {
-                        passwordDomain = dom
+                    if (dom != null) {
+                        if (passwordDomain == null) passwordDomain = dom
+                        if (isFocused && focusedPasswordDomain == null) focusedPasswordDomain = dom
                     }
                 },
                 passwordIds = passwordIds,
@@ -135,9 +139,25 @@ internal object AssistStructureParser {
             passwordIds = passwordIds.distinct(),
             focusedEditableId = focusedEditableId,
             allEditableIds = allEditableIds.distinct(),
-            webDomain = focusedDomain ?: passwordDomain ?: detectedDomain,
+            webDomain = focusedPasswordDomain ?: focusedDomain ?: passwordDomain ?: detectedDomain,
             packageName = pkgName
         )
+    }
+
+    internal fun resolveNodeDomain(rawDomain: String?, rawScheme: String?): String? {
+        val cleanDomain = rawDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() } ?: return null
+        val cleanScheme = rawScheme?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
+        val candidate = if (
+            cleanScheme != null &&
+            !cleanDomain.contains("://") &&
+            !cleanDomain.startsWith("//") &&
+            !cleanDomain.startsWith("$cleanScheme:")
+        ) {
+            "$cleanScheme://$cleanDomain"
+        } else {
+            cleanDomain
+        }
+        return PreferencesRepository.normalizeDomain(candidate).takeIf { it.isNotEmpty() }
     }
 
     private fun traverseNode(
@@ -149,9 +169,8 @@ internal object AssistStructureParser {
         passwordIds: MutableList<AutofillId>,
         allEditableIds: MutableList<AutofillId>
     ) {
-        val dom = node.webDomain
-            ?.let(Spv2Spec::ecmaTrim)
-            ?.takeIf { PreferencesRepository.normalizeDomain(it).isNotEmpty() }
+        val rawScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) node.webScheme else null
+        val dom = resolveNodeDomain(node.webDomain, rawScheme)
         if (dom != null) {
             onDomain(dom)
         }
@@ -213,25 +232,27 @@ internal object AssistStructureParser {
         // 1. Explicit Android autofillHints
         val hints = node.autofillHints
         if (!hints.isNullOrEmpty()) {
-            val cleanHints = hints.mapNotNull { it?.let(Spv2Spec::ecmaTrim)?.takeIf(String::isNotEmpty) }
+            val cleanHints = hints.mapNotNull {
+                it?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty)
+            }
             if (cleanHints.any { hint ->
-                    hint.equals(View.AUTOFILL_HINT_PASSWORD, ignoreCase = true) ||
-                        hint.contains("password", ignoreCase = true) ||
-                        hint.equals("newPassword", ignoreCase = true)
+                    hint == View.AUTOFILL_HINT_PASSWORD.lowercase(Locale.ROOT) ||
+                        hint.contains("password") ||
+                        hint == "newpassword"
                 }
             ) {
                 return true
             }
             if (cleanHints.any { hint ->
-                    hint.equals(View.AUTOFILL_HINT_USERNAME, ignoreCase = true) ||
-                        hint.contains("username", ignoreCase = true) ||
-                        hint.equals(View.AUTOFILL_HINT_EMAIL_ADDRESS, ignoreCase = true) ||
-                        hint.contains("email", ignoreCase = true) ||
-                        hint.equals(View.AUTOFILL_HINT_PHONE, ignoreCase = true) ||
-                        hint.contains("phone", ignoreCase = true) ||
-                        hint.equals(View.AUTOFILL_HINT_NAME, ignoreCase = true) ||
-                        hint.equals("one-time-code", ignoreCase = true) ||
-                        hint.contains("otp", ignoreCase = true)
+                    hint == View.AUTOFILL_HINT_USERNAME.lowercase(Locale.ROOT) ||
+                        hint.contains("username") ||
+                        hint == View.AUTOFILL_HINT_EMAIL_ADDRESS.lowercase(Locale.ROOT) ||
+                        hint.contains("email") ||
+                        hint == View.AUTOFILL_HINT_PHONE.lowercase(Locale.ROOT) ||
+                        hint.contains("phone") ||
+                        hint == View.AUTOFILL_HINT_NAME.lowercase(Locale.ROOT) ||
+                        hint == "one-time-code" ||
+                        hint.contains("otp")
                 }
             ) {
                 return false
@@ -257,7 +278,7 @@ internal object AssistStructureParser {
                         explicitNonPasswordHtml = true
                     }
                 }
-                if (attrName == "name" || attrName == "id" || attrName == "placeholder") {
+                if (attrName == "name" || attrName == "id" || attrName == "placeholder" || attrName == "aria-label") {
                     if (NON_PASSWORD_FIELD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
                         explicitNonPasswordHtml = true
                     } else if (PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
