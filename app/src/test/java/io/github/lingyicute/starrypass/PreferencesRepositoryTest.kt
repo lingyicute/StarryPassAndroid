@@ -169,4 +169,36 @@ class PreferencesRepositoryTest {
 
         assertEquals("a", repo.findMatchingPreset("login.example.com", null)?.id)
     }
+
+    @Test
+    fun `autofill matching prioritises explicit package and exact domain code over stem code`() = runBlocking {
+        val repo = repository()
+        val exactDomainCode = SitePreset(id = "exact", code = "gist.github.com")
+        val stemCode = SitePreset(id = "stem", code = "github", counter = 3)
+        val pkgBound = SitePreset(id = "pkg", code = "corp-sso", autofillPackage = "com.example.corp")
+        repo.upsertPreset(exactDomainCode)
+        repo.upsertPreset(stemCode)
+        repo.upsertPreset(pkgBound)
+
+        assertEquals("exact", repo.findMatchingPreset("https://gist.github.com/login", null)?.id)
+        assertEquals("pkg", repo.findMatchingPreset("https://github.com/login", "com.example.corp")?.id)
+        assertEquals("stem", repo.findMatchingPreset(null, "com.github.android")?.id)
+    }
+
+    @Test
+    fun `decodePresets skips blank codes or duplicate ids and clamps out-of-range fields`() = runBlocking {
+        val file = temporaryFolder.newFile("sanitised.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"dup","code":"  "},{"id":"dup","code":" alpha ","length":999,"counter":-5},{"id":"dup","code":"beta"}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        val loaded = repo.presetsFlow.first().single()
+        assertEquals("dup", loaded.id)
+        assertEquals("alpha", loaded.code)
+        assertEquals(64, loaded.length)
+        assertEquals(1, loaded.counter)
+    }
 }
