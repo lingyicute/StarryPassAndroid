@@ -237,10 +237,14 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
 
+        private fun isTwoPartPublicSuffix(secondLevel: String, tld: String): Boolean =
+            "$secondLevel.$tld" in MULTI_PART_TLDS ||
+                (tld.length == 2 && secondLevel in GENERIC_SECOND_LEVEL)
+
         fun normalizeDomain(raw: String): String {
             var s = raw.trim().lowercase()
             s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
-            val end = s.indexOfAny(charArrayOf('/', '?', '#'))
+            val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
             s = s.substringAfterLast('@')
             if (s.startsWith("[")) {
@@ -252,8 +256,14 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (colon >= 0) s = s.substring(0, colon)
             }
             // Cookie-style entries (`.example.com`, `*.example.com`) already match by suffix.
-            s = s.removePrefix("*.").trimStart('.').trimEnd('.')
-            s = s.removePrefix("www.")
+            s = s.trimStart('.').removePrefix("*.").trimStart('.').trimEnd('.')
+            if (s.startsWith("www.")) {
+                val withoutWww = s.removePrefix("www.").trimStart('.')
+                val parts = withoutWww.split('.').filter { it.isNotEmpty() }
+                if (parts.size >= 3 || (parts.size == 2 && !isTwoPartPublicSuffix(parts[0], parts[1]))) {
+                    s = withoutWww
+                }
+            }
             return s
         }
 
@@ -285,14 +295,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val clean = normalizeDomain(domain)
             if (clean.isEmpty()) return ""
             // An IP address has no registrable name; its last octet would be a meaningless code.
-            if (IPV4_ADDRESS.matches(clean)) return clean
+            if (IPV4_ADDRESS.matches(clean) || clean.startsWith("[")) return clean
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
-            val tail2 = parts.takeLast(2).joinToString(".")
-            val multiPartSuffix = parts.size >= 3 && (
-                tail2 in MULTI_PART_TLDS ||
-                    (parts.last().length == 2 && parts[parts.size - 2] in GENERIC_SECOND_LEVEL)
-                )
+            val multiPartSuffix = parts.size >= 3 &&
+                isTwoPartPublicSuffix(parts[parts.size - 2], parts.last())
             return if (multiPartSuffix) {
                 parts[parts.size - 3]
             } else {

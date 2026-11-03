@@ -62,8 +62,19 @@ class DomainSuggestionTest {
     fun `strips leading dot and wildcard so cookie-style domains still match`() {
         assertEquals("example.com", PreferencesRepository.normalizeDomain(".example.com"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain("*.example.com"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain(".*.example.com"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain("*.www.Example.com:443"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext("*.github.com", null))
+    }
+
+    @Test
+    fun `preserves www when it is the registrable domain label and keeps IPv4-mapped IPv6 whole`() {
+        assertEquals("www.com", PreferencesRepository.normalizeDomain("https://www.com/login"))
+        assertEquals("www.co.uk", PreferencesRepository.normalizeDomain("https://www.co.uk"))
+        assertEquals("www.gov.in", PreferencesRepository.normalizeDomain("www.gov.in"))
+        assertEquals("www", PreferencesRepository.extractDomainStem("https://www.com"))
+        assertEquals("www", PreferencesRepository.extractDomainStem("https://www.co.uk"))
+        assertEquals("[::ffff:192.168.1.1]", PreferencesRepository.extractDomainStem("http://[::ffff:192.168.1.1]:8080/login"))
     }
 
     @Test
