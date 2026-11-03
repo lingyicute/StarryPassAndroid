@@ -32,6 +32,25 @@ class SecureClipboardManager(context: Context) {
     private var clearJob: Job? = null
     private var lastCopiedSha256: ByteArray? = null
 
+    // Changes this manager makes itself are expected to echo through the listener once each.
+    private var ownChangesPending = 0
+
+    // Android 10+ hides the clipboard from a background app, but change callbacks still arrive.
+    // They tell us the user copied something else even when the content cannot be read.
+    private var replacedByOther = false
+
+    private val clipChangedListener = ClipboardManager.OnPrimaryClipChangedListener {
+        if (ownChangesPending > 0) {
+            ownChangesPending--
+        } else if (lastCopiedSha256 != null) {
+            replacedByOther = true
+        }
+    }
+
+    init {
+        clipboard.addPrimaryClipChangedListener(clipChangedListener)
+    }
+
     private val _remainingSeconds = MutableStateFlow(0)
     val remainingSeconds: StateFlow<Int> = _remainingSeconds.asStateFlow()
 
@@ -51,7 +70,14 @@ class SecureClipboardManager(context: Context) {
                 putBoolean(key, true)
             }
             clip.description.extras = extras
-            clipboard.setPrimaryClip(clip)
+            ownChangesPending++
+            try {
+                clipboard.setPrimaryClip(clip)
+            } catch (t: Throwable) {
+                ownChangesPending--
+                throw t
+            }
+            replacedByOther = false
 
             val secretBytes = secret.toByteArray(Charsets.UTF_8)
             val digest = Spv2Primitives.sha256(secretBytes)
@@ -71,8 +97,9 @@ class SecureClipboardManager(context: Context) {
         clearJob = null
         _remainingSeconds.value = 0
         // Same rule as the timer: do not destroy something the user copied after the password.
+        // Without a recorded copy there is nothing of ours to remove.
         val expectedHash = lastCopiedSha256
-        if (expectedHash == null || shouldWipeNow(expectedHash)) {
+        if (expectedHash != null && shouldWipeNow(expectedHash)) {
             wipeSystemClipboard()
         }
         Spv2Spec.zeroize(lastCopiedSha256)
@@ -102,6 +129,8 @@ class SecureClipboardManager(context: Context) {
             _remainingSeconds.value = 0
             return
         }
+        // The countdown lives in this process: if the system reclaims the process while the app is
+        // in the background, the clipboard is not cleared.
         clearJob = scope.launch {
             var rem = seconds
             _remainingSeconds.value = rem
@@ -110,7 +139,7 @@ class SecureClipboardManager(context: Context) {
                 rem--
                 _remainingSeconds.value = rem
             }
-            // Clear unless the clipboard is readable and now holds something else
+            // Clear unless the user is known to have replaced the clip with something else
             val expectedHash = lastCopiedSha256
             if (expectedHash != null && shouldWipeNow(expectedHash)) {
                 wipeSystemClipboard()
@@ -125,17 +154,18 @@ class SecureClipboardManager(context: Context) {
         // that the clipboard no longer holds our password.
         val clip = runCatching { clipboard.primaryClip }.getOrNull()
         val text = runCatching { clip?.getItemAt(0)?.text?.toString() }.getOrNull()
-        return ClipboardWipePolicy.shouldWipe(expectedSha256, clip != null, text)
+        return ClipboardWipePolicy.shouldWipe(expectedSha256, clip != null, text, replacedByOther)
     }
 
     private fun wipeSystemClipboard() {
+        ownChangesPending++
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 clipboard.clearPrimaryClip()
             } else {
                 clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
             }
-        }
+        }.onFailure { ownChangesPending-- }
     }
 }
 
@@ -143,9 +173,15 @@ internal object ClipboardWipePolicy {
     /**
      * [clipReadable] is false when the clipboard is empty or hidden from this app;
      * [currentText] is the text of a readable clip, or null for non-text content.
+     * [replacedByOther] is true when a change not made by us was observed since the copy.
      */
-    fun shouldWipe(expectedSha256: ByteArray, clipReadable: Boolean, currentText: String?): Boolean {
-        if (!clipReadable) return true
+    fun shouldWipe(
+        expectedSha256: ByteArray,
+        clipReadable: Boolean,
+        currentText: String?,
+        replacedByOther: Boolean = false
+    ): Boolean {
+        if (!clipReadable) return !replacedByOther
         if (currentText == null) return false
         val bytes = currentText.toByteArray(Charsets.UTF_8)
         val currentHash = Spv2Primitives.sha256(bytes)
