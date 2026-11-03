@@ -219,6 +219,23 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `decodePresets does not reserve the id of an entry rejected for a duplicate code`() = runBlocking {
+        val file = temporaryFolder.newFile("reserved_id.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"id1","code":"alpha","counter":3},{"id":"id2","code":"alpha"},{"id":"id2","code":"beta","counter":5}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        val loaded = repo.presetsFlow.first().associateBy { it.code }
+        assertEquals(setOf("alpha", "beta"), loaded.keys)
+        assertEquals("id1", loaded.getValue("alpha").id)
+        assertEquals("id2", loaded.getValue("beta").id)
+        assertEquals(5, loaded.getValue("beta").counter)
+    }
+
+    @Test
     fun `ecmaTrim sanitizes non-ASCII whitespace in alias and package and matches parent domain codes`() = runBlocking {
         val repo = repository()
         val preset = SitePreset(
