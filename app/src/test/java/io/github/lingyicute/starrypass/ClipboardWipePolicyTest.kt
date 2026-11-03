@@ -29,4 +29,12 @@ class ClipboardWipePolicyTest {
     fun `keeps an unreadable clip that the user is known to have replaced`() {
         assertFalse(ClipboardWipePolicy.shouldWipe(expected, false, null, replacedByOther = true))
     }
+
+    @Test
+    fun `duplicate system callback while password is still readable does not mark clip as replaced`() {
+        assertFalse(ClipboardWipePolicy.isReplacedByOther(expected, true, "secret"))
+        assertTrue(ClipboardWipePolicy.isReplacedByOther(expected, true, "other"))
+        assertTrue(ClipboardWipePolicy.isReplacedByOther(expected, true, null))
+        assertTrue(ClipboardWipePolicy.isReplacedByOther(expected, false, null))
+    }
 }
