@@ -69,6 +69,8 @@ class Spv2Engine(
     private var sessionNonce: ByteArray? = null
     private var cachedTag: ByteArray? = null
     private var cachedSk: ByteArray? = null
+
+    @Volatile
     private var cachedOwner: Any? = null
 
     val isSelfTestVerified: Boolean
@@ -89,7 +91,7 @@ class Spv2Engine(
     suspend fun derive(request: DeriveRequest): DeriveResult {
         val owner = Any()
         try {
-            return withContext(computeDispatcher) {
+            val result = withContext(computeDispatcher) {
                 mutex.withLock {
                     currentCoroutineContext().ensureActive()
                     val t0 = System.nanoTime()
@@ -119,8 +121,10 @@ class Spv2Engine(
                                 Spv2Primitives.constantTimeEquals(reqTag, existingTag)
                             ) {
                                 currentCoroutineContext().ensureActive()
-                                // A later successful request owns a reused cache entry.
-                                cachedOwner = owner
+                                // Adopt ownership only when the cached entry has not yet been committed.
+                                if (cachedOwner != null) {
+                                    cachedOwner = owner
+                                }
                                 sk = existingSk
                                 usedCache = true
                             } else {
@@ -171,9 +175,13 @@ class Spv2Engine(
                     }
                 }
             }
+            if (cachedOwner === owner) {
+                cachedOwner = null
+            }
+            return result
         } catch (cancelled: CancellationException) {
             // withContext can discard an already computed result when dispatching back to a
-            // cancelled caller. Only clear this request's cache, not a newer request's entry.
+            // cancelled caller. Only clear this request's uncommitted cache, not a committed or newer entry.
             withContext(NonCancellable) {
                 mutex.withLock {
                     if (cachedOwner === owner) clearCachedKeyLocked()
