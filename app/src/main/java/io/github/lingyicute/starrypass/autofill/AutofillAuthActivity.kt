@@ -121,7 +121,9 @@ import io.github.lingyicute.starrypass.ui.theme.StarryPassTheme
 import io.github.lingyicute.starrypass.ui.tierShortLabelText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class AutofillAuthActivity : FragmentActivity() {
@@ -209,6 +211,12 @@ class AutofillAuthActivity : FragmentActivity() {
             var deriveJob by remember { mutableStateOf<Job?>(null) }
             var observedWipe by remember { mutableStateOf(app.sessionWipes.generation.value) }
 
+            LaunchedEffect(master.isEmpty()) {
+                if (master.isEmpty()) {
+                    showMaster = false
+                }
+            }
+
             LaunchedEffect(app) {
                 app.sessionWipes.generation.collect { generation ->
                     if (generation != observedWipe) {
@@ -233,8 +241,13 @@ class AutofillAuthActivity : FragmentActivity() {
                 deriveJob?.cancel()
                 deriveJob = scope.launch {
                     try {
-                        val res = app.engine.derive(request)
-                        app.engine.wipeSession()
+                        val res = try {
+                            app.engine.derive(request)
+                        } finally {
+                            withContext(NonCancellable) {
+                                app.engine.wipeSession()
+                            }
+                        }
                         // A wipe may be signalled before the Compose collector gets CPU time.
                         if (!app.sessionWipes.isCurrent(generation)) return@launch
                         if (copyOnly) {
@@ -382,10 +395,12 @@ class AutofillAuthActivity : FragmentActivity() {
                                             FilterChip(
                                                 selected = selected,
                                                 onClick = {
+                                                    val clampedCounter = Spv2Spec.clampCounter(preset.counter)
                                                     code = preset.code
                                                     length = Spv2Spec.clampLength(preset.length)
                                                     mode = preset.mode
-                                                    counter = Spv2Spec.clampCounter(preset.counter)
+                                                    counter = clampedCounter
+                                                    counterText = clampedCounter.toString()
                                                     tier = preset.tier
                                                 },
                                                 label = {
