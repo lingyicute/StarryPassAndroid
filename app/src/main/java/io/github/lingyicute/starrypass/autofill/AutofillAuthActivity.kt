@@ -239,12 +239,18 @@ class AutofillAuthActivity : FragmentActivity() {
                         // A wipe may be signalled before the Compose collector gets CPU time.
                         if (!app.sessionWipes.isCurrent(generation)) return@launch
                         if (copyOnly) {
-                            app.clipboardManager.copySensitivePassword(
+                            val copied = app.clipboardManager.copySensitivePassword(
                                 label = getString(R.string.app_name),
                                 secret = res.password,
                                 autoClearSeconds = settings.clipboardAutoClearSeconds
                             )
-                            cancelAutofill()
+                            if (copied) {
+                                cancelAutofill()
+                            } else {
+                                // Keep the sheet open so the user is not left with nothing copied.
+                                busy = false
+                                errorMsg = getString(R.string.clipboard_copy_failed)
+                            }
                         } else {
                             completeAutofill(targetIds, cleanCode, res.password)
                         }
