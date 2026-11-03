@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import java.util.UUID
 
 private val Context.starryPassDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "starrypass_preferences",
@@ -185,18 +186,35 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 val pd = normalizeDomain(preset.autofillDomain)
                 if (pd.isNotEmpty() && (normDomain == pd || normDomain.endsWith(".$pd"))) preset to pd else null
             }.maxByOrNull { (_, pd) -> pd.length }?.let { return it.first }
-
-            val domainStem = extractDomainStem(normDomain)
-            presets.firstOrNull { preset ->
-                preset.code.equals(normDomain, ignoreCase = true) ||
-                    (domainStem.isNotEmpty() && preset.code.equals(domainStem, ignoreCase = true))
-            }?.let { return it }
         }
 
         if (normPkg != null) {
             presets.firstOrNull { preset ->
-                preset.autofillPackage.isNotEmpty() && preset.autofillPackage.equals(normPkg, ignoreCase = true)
+                val pkg = preset.autofillPackage.trim()
+                pkg.isNotEmpty() && pkg.equals(normPkg, ignoreCase = true)
             }?.let { return it }
+        }
+
+        if (normDomain != null) {
+            presets.firstOrNull { preset ->
+                preset.code.equals(normDomain, ignoreCase = true)
+            }?.let { return it }
+
+            val domainStem = extractDomainStem(normDomain)
+            if (domainStem.isNotEmpty()) {
+                presets.firstOrNull { preset ->
+                    preset.code.equals(domainStem, ignoreCase = true)
+                }?.let { return it }
+            }
+        }
+
+        if (normPkg != null) {
+            val pkgStem = suggestCodeFromContext(null, normPkg)
+            if (pkgStem.isNotEmpty()) {
+                presets.firstOrNull { preset ->
+                    preset.code.equals(pkgStem, ignoreCase = true)
+                }?.let { return it }
+            }
         }
 
         return null
@@ -210,8 +228,25 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (raw.isNullOrBlank()) return emptyList()
         val array = runCatching { json.parseToJsonElement(raw) as? JsonArray }.getOrNull()
             ?: return emptyList()
+        val seenIds = HashSet<String>()
         return array.mapNotNull { element ->
-            runCatching { json.decodeFromJsonElement(SitePreset.serializer(), element) }.getOrNull()
+            val decoded = runCatching {
+                json.decodeFromJsonElement(SitePreset.serializer(), element)
+            }.getOrNull() ?: return@mapNotNull null
+            val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
+            if (cleanCode.isEmpty()) return@mapNotNull null
+            val cleanId = decoded.id.trim().ifEmpty { UUID.randomUUID().toString() }
+            if (!seenIds.add(cleanId)) return@mapNotNull null
+            decoded.copy(
+                id = cleanId,
+                code = cleanCode,
+                alias = decoded.alias.trim(),
+                modeKey = decoded.mode.key,
+                length = Spv2Spec.clampLength(decoded.length),
+                counter = Spv2Spec.clampCounter(decoded.counter),
+                tierKey = decoded.tier.key,
+                autofillPackage = decoded.autofillPackage.trim()
+            )
         }
     }
 
