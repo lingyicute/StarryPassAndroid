@@ -74,6 +74,10 @@ class BiometricMasterVault(
             runCatching { clear() }
             runCatching { prompt.cancelAuthentication() }
         }
+        if (enrollmentOwner != null) {
+            enrollmentOwner = null
+            discardUnenrolledKey()
+        }
     }
 
     fun queryHardwareStatus(): BiometricHardwareStatus {
@@ -99,6 +103,9 @@ class BiometricMasterVault(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+        if (activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved) {
+            return
+        }
         if (masterPassword.isEmpty()) {
             onError(activity.getString(R.string.biometric_err_empty_master))
             return
@@ -109,9 +116,6 @@ class BiometricMasterVault(
         }
         if (enrollmentOwner != null || activePrompts.isNotEmpty()) {
             onError(activity.getString(R.string.biometric_err_auth_in_progress))
-            return
-        }
-        if (activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved) {
             return
         }
 
@@ -163,8 +167,7 @@ class BiometricMasterVault(
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         activity.lifecycle.removeObserver(destroyObserver)
-                        activePrompts.remove(authPrompt)
-                        if (enrollmentOwner !== owner) return
+                        if (activePrompts.remove(authPrompt) == null || enrollmentOwner !== owner) return
                         val secret = pendingMaster
                         pendingMaster = null
                         if (!sessionWipes.isCurrent(generation) || secret == null) {
@@ -249,6 +252,11 @@ class BiometricMasterVault(
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
+        if (enrollmentOwner != null || activePrompts.isNotEmpty() ||
+            activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved
+        ) {
+            return
+        }
         val ivB64 = prefs.getString(PREF_IV, null)
         val ctB64 = prefs.getString(PREF_CT, null)
         val key = getExistingKeystoreKey()
@@ -259,11 +267,6 @@ class BiometricMasterVault(
         if (key == null || !isHardwareBacked(key)) {
             // Preserve the existing ciphertext and key for explicit user revocation.
             onError(activity.getString(R.string.biometric_err_hardware_unverified))
-            return
-        }
-        if (enrollmentOwner != null || activePrompts.isNotEmpty() ||
-            activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved
-        ) {
             return
         }
 
