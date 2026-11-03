@@ -32,6 +32,7 @@ import io.github.lingyicute.starrypass.MainActivity
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.data.PreferencesRepository
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -71,7 +72,11 @@ class StarryPassAutofillService : AutofillService() {
             return
         }
 
-        val job = serviceScope.launch {
+        // Answer the framework even when preset lookup or dataset building fails.
+        val failureHandler = CoroutineExceptionHandler { _, _ ->
+            runCatching { callback.onSuccess(null) }
+        }
+        val job = serviceScope.launch(failureHandler) {
             val app = application as StarryPassApp
             val matchedPreset = app.preferencesRepository.findMatchingPreset(
                 webDomain = parsed.webDomain,
