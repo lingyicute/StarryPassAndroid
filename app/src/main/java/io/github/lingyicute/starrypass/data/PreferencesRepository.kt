@@ -328,7 +328,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         private val NON_NETWORK_URI = Regex(
             "^(?:mailto|tel|sms|smsto|mms|mmsto|voicemail|cid|mid|geo|urn|javascript|about|data|file|content|intent|market|android-app):"
         )
-        private val IPV6_HOST = Regex("^[0-9a-f:.]+$")
+        private val HEX_GROUP = Regex("^[0-9a-f]{1,4}$")
         private val PORT_DIGITS = Regex("^\\d{1,5}$")
 
         private fun isTwoPartPublicSuffix(secondLevel: String, tld: String): Boolean =
@@ -336,14 +336,51 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 (tld.length == 2 && secondLevel in GENERIC_SECOND_LEVEL)
 
         private fun isValidPort(rawPort: String): Boolean {
-            if (rawPort.isEmpty()) return true
             if (!PORT_DIGITS.matches(rawPort)) return false
             val port = rawPort.toIntOrNull() ?: return false
             return port in 1..65535
         }
 
-        private fun isValidIpv6Literal(host: String): Boolean =
-            host.contains(':') && IPV6_HOST.matches(host)
+        private fun isValidIpv4Literal(host: String): Boolean {
+            if (!IPV4_ADDRESS.matches(host)) return false
+            return host.split('.').all { part ->
+                val octet = part.toIntOrNull() ?: return@all false
+                octet in 0..255
+            }
+        }
+
+        private fun isValidIpv6Literal(host: String): Boolean {
+            if (!host.contains(':') || host.contains(":::")) return false
+            if ((host.startsWith(":") && !host.startsWith("::")) ||
+                (host.endsWith(":") && !host.endsWith("::"))
+            ) {
+                return false
+            }
+            val doubleColonParts = host.split("::")
+            if (doubleColonParts.size > 2) return false
+            val hasCompression = doubleColonParts.size == 2
+            val left = if (doubleColonParts[0].isEmpty()) emptyList() else doubleColonParts[0].split(':')
+            val right = if (hasCompression && doubleColonParts[1].isEmpty()) {
+                emptyList()
+            } else if (hasCompression) {
+                doubleColonParts[1].split(':')
+            } else {
+                emptyList()
+            }
+            val segments = left + right
+            var groupCount = 0
+            for (i in segments.indices) {
+                val seg = segments[i]
+                if (seg.contains('.')) {
+                    if (i != segments.lastIndex || !isValidIpv4Literal(seg)) return false
+                    groupCount += 2
+                } else {
+                    if (!HEX_GROUP.matches(seg)) return false
+                    groupCount += 1
+                }
+            }
+            return if (hasCompression) groupCount in 1..7 || host == "::" else groupCount == 8
+        }
 
         private fun normalizeCodeAsDomain(rawCode: String): String {
             val trimmed = Spv2Spec.ecmaTrim(rawCode).lowercase(Locale.ROOT)
@@ -406,6 +443,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             s = s.trimEnd('.')
             if (s.isEmpty() || s == "*" || (!s.startsWith("[") && s.contains(".."))) return ""
             if (s.any { it <= ' ' || Spv2Spec.ecmaTrim(it.toString()).isEmpty() }) return ""
+            if (!s.startsWith("[")) {
+                if (s.indexOfAny(charArrayOf('[', ']', '*')) >= 0) return ""
+                val labels = s.split('.')
+                if (labels.any { it.isEmpty() || it.startsWith('-') || it.endsWith('-') }) return ""
+                if (IPV4_ADDRESS.matches(s) && !isValidIpv4Literal(s)) return ""
+            }
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
                 val parts = withoutWww.split('.').filter { it.isNotEmpty() }
@@ -444,7 +487,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val clean = normalizeDomain(domain)
             if (clean.isEmpty()) return ""
             // An IP address has no registrable name; its last octet would be a meaningless code.
-            if (IPV4_ADDRESS.matches(clean) || clean.startsWith("[")) return clean
+            if (isValidIpv4Literal(clean) || clean.startsWith("[")) return clean
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
             val multiPartSuffix = parts.size >= 3 &&
