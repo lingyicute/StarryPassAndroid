@@ -53,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +62,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -88,8 +90,14 @@ fun PresetsScreen(
     var editingPreset by remember { mutableStateOf<SitePreset?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(presets.isEmpty()) {
+        if (presets.isEmpty() && searchQuery.isNotEmpty()) {
+            searchQuery = ""
+        }
+    }
+
     val filtered = remember(presets, searchQuery) {
-        val q = searchQuery.trim().lowercase()
+        val q = Spv2Spec.ecmaTrim(searchQuery).lowercase()
         if (q.isEmpty()) {
             presets
         } else {
@@ -340,9 +348,10 @@ private fun PresetEditDialog(
 ) {
     var code by remember { mutableStateOf(initial?.code ?: "") }
     var alias by remember { mutableStateOf(initial?.alias ?: "") }
-    var length by remember { mutableIntStateOf(initial?.length ?: Spv2Spec.DEFAULT_LENGTH) }
+    var length by remember { mutableIntStateOf(Spv2Spec.clampLength(initial?.length)) }
     var mode by remember { mutableStateOf(initial?.mode ?: Spv2Mode.FULL) }
-    var counterText by remember { mutableStateOf((initial?.counter ?: 1).toString()) }
+    var counter by remember { mutableIntStateOf(Spv2Spec.clampCounter(initial?.counter)) }
+    var counterText by remember(counter) { mutableStateOf(counter.toString()) }
     var tier by remember { mutableStateOf(initial?.tier ?: Spv2Tier.STANDARD) }
     var domain by remember { mutableStateOf(initial?.autofillDomain ?: "") }
     var pkg by remember { mutableStateOf(initial?.autofillPackage ?: "") }
@@ -411,11 +420,23 @@ private fun PresetEditDialog(
                 ) {
                     OutlinedTextField(
                         value = counterText,
-                        onValueChange = { counterText = it.filter(Char::isDigit).take(4) },
+                        onValueChange = { raw ->
+                            val digits = raw.filter(Char::isDigit).take(4)
+                            counterText = digits
+                            digits.toIntOrNull()?.let { parsed ->
+                                if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER) {
+                                    counter = parsed
+                                }
+                            }
+                        },
                         singleLine = true,
                         label = { Text("#") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(96.dp)
+                        modifier = Modifier
+                            .width(96.dp)
+                            .onFocusChanged { focus ->
+                                if (!focus.isFocused) counterText = counter.toString()
+                            }
                     )
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
                         SegmentedButton(
@@ -462,7 +483,7 @@ private fun PresetEditDialog(
             Button(
                 enabled = Spv2Spec.ecmaTrim(code).isNotEmpty(),
                 onClick = {
-                    val ctr = Spv2Spec.clampCounter(counterText.toIntOrNull())
+                    val ctr = Spv2Spec.clampCounter(counter)
                     val result = (initial ?: SitePreset(code = code)).copy(
                         code = Spv2Spec.ecmaTrim(code),
                         alias = alias.trim(),

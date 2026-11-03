@@ -204,6 +204,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun upsertPreset(preset: SitePreset) {
+        val cleanCode = Spv2Spec.ecmaTrim(preset.code)
+        if (cleanCode.isEmpty()) return
+        if (Spv2Spec.ecmaTrim(_uiState.value.code) == cleanCode) {
+            derivation.updateInputs(debounceMs = 0L) {
+                it.copy(
+                    code = cleanCode,
+                    mode = preset.mode,
+                    length = Spv2Spec.clampLength(preset.length),
+                    counter = Spv2Spec.clampCounter(preset.counter),
+                    tier = preset.tier
+                )
+            }
+        }
         viewModelScope.launch { prefsRepo.upsertPreset(preset) }
     }
 

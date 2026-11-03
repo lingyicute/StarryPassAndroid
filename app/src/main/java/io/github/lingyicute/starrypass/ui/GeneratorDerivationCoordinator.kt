@@ -52,7 +52,14 @@ internal class GeneratorDerivationCoordinator(
             } else {
                 StrengthEstimate(0, 0, StrengthReason.EMPTY)
             }
-            next.copy(derivedPassword = null, isDeriving = ready, errorCode = null, strength = strength)
+            next.copy(
+                derivedPassword = null,
+                isDeriving = ready,
+                lastCached = false,
+                lastElapsedMs = 0L,
+                errorCode = null,
+                strength = strength
+            )
         }
         if (!snapshot.isDeriving) return
 
