@@ -84,6 +84,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -540,7 +541,13 @@ fun GeneratorScreen(
                                                     keyboardType = KeyboardType.Number,
                                                     imeAction = ImeAction.Done
                                                 ),
-                                                modifier = Modifier.width(96.dp)
+                                                modifier = Modifier
+                                                    .width(96.dp)
+                                                    .onFocusChanged { focus ->
+                                                        // Do not leave an empty or out-of-range entry that differs
+                                                        // from the counter actually used for derivation.
+                                                        if (!focus.isFocused) counterText = uiState.counter.toString()
+                                                    }
                                             )
                                             FilledTonalIconButton(
                                                 onClick = { onCounterChange(uiState.counter + 1) },
