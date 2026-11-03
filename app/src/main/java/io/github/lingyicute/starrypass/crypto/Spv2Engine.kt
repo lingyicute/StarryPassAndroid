@@ -70,8 +70,9 @@ class Spv2Engine(
     private var cachedTag: ByteArray? = null
     private var cachedSk: ByteArray? = null
 
-    @Volatile
-    private var cachedOwner: Any? = null
+    private val cacheStateLock = Any()
+    private var cacheCommitted = false
+    private val uncommittedOwners = HashSet<Any>()
 
     val isSelfTestVerified: Boolean
         get() = selfTestPassed
@@ -121,9 +122,11 @@ class Spv2Engine(
                                 Spv2Primitives.constantTimeEquals(reqTag, existingTag)
                             ) {
                                 currentCoroutineContext().ensureActive()
-                                // Adopt ownership only when the cached entry has not yet been committed.
-                                if (cachedOwner != null) {
-                                    cachedOwner = owner
+                                // Track every in-flight caller using an uncommitted cache entry.
+                                synchronized(cacheStateLock) {
+                                    if (!cacheCommitted) {
+                                        uncommittedOwners.add(owner)
+                                    }
                                 }
                                 sk = existingSk
                                 usedCache = true
@@ -152,7 +155,9 @@ class Spv2Engine(
                                     clearCachedKeyLocked()
                                     cachedSk = fresh
                                     cachedTag = reqTag
-                                    cachedOwner = owner
+                                    synchronized(cacheStateLock) {
+                                        uncommittedOwners.add(owner)
+                                    }
                                     tagTransferred = true
                                     sk = fresh
                                     usedCache = false
@@ -175,16 +180,23 @@ class Spv2Engine(
                     }
                 }
             }
-            if (cachedOwner === owner) {
-                cachedOwner = null
+            synchronized(cacheStateLock) {
+                if (uncommittedOwners.remove(owner)) {
+                    cacheCommitted = true
+                    uncommittedOwners.clear()
+                }
             }
             return result
         } catch (cancelled: CancellationException) {
             // withContext can discard an already computed result when dispatching back to a
-            // cancelled caller. Only clear this request's uncommitted cache, not a committed or newer entry.
+            // cancelled caller. Only clear this request's uncommitted cache when no caller
+            // has committed it and no other uncommitted caller is still in flight.
             withContext(NonCancellable) {
                 mutex.withLock {
-                    if (cachedOwner === owner) clearCachedKeyLocked()
+                    val shouldClear = synchronized(cacheStateLock) {
+                        uncommittedOwners.remove(owner) && !cacheCommitted && uncommittedOwners.isEmpty()
+                    }
+                    if (shouldClear) clearCachedKeyLocked()
                 }
             }
             throw cancelled
@@ -207,7 +219,10 @@ class Spv2Engine(
         cachedTag = null
         Spv2Spec.zeroize(cachedSk)
         cachedSk = null
-        cachedOwner = null
+        synchronized(cacheStateLock) {
+            cacheCommitted = false
+            uncommittedOwners.clear()
+        }
     }
 
     private fun getOrCreateSessionNonceLocked(): ByteArray {
