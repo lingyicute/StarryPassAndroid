@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -94,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -190,11 +192,10 @@ class AutofillAuthActivity : FragmentActivity() {
             val presets by app.preferencesRepository.presetsFlow.collectAsState(initial = emptyList())
             val bioEnrolled by app.biometricVault.isEnrolled.collectAsState()
             val scope = rememberCoroutineScope()
+            val focusManager = LocalFocusManager.current
 
             // Respect user's screenshot protection setting inside Autofill sheet as well
             ScreenSecurityEffect(flagSecureEnabled = settings.flagSecure)
-
-            BackHandler { cancelAutofill() }
 
             // Never persist the master password in saved instance state.
             var master by remember { mutableStateOf("") }
@@ -231,9 +232,22 @@ class AutofillAuthActivity : FragmentActivity() {
                 }
             }
 
+            fun dismissAutofill() {
+                deriveJob?.cancel()
+                deriveJob = null
+                master = ""
+                showMaster = false
+                busy = false
+                app.biometricVault.cancelPendingAuthentication()
+                cancelAutofill()
+            }
+
+            BackHandler { dismissAutofill() }
+
             fun executeDerive(secretMaster: String, copyOnly: Boolean) {
                 val cleanCode = Spv2Spec.ecmaTrim(code)
                 if (secretMaster.isEmpty() || cleanCode.isEmpty()) return
+                counterText = counter.toString()
                 val generation = app.sessionWipes.generation.value
                 val request = DeriveRequest(secretMaster, cleanCode, tier, counter, length, mode)
                 busy = true
@@ -248,8 +262,8 @@ class AutofillAuthActivity : FragmentActivity() {
                                 app.engine.wipeSession()
                             }
                         }
-                        // A wipe may be signalled before the Compose collector gets CPU time.
-                        if (!app.sessionWipes.isCurrent(generation)) return@launch
+                        // A wipe or activity cancellation may happen before the result is delivered.
+                        if (!app.sessionWipes.isCurrent(generation) || isFinishing || isDestroyed) return@launch
                         if (copyOnly) {
                             val copied = app.clipboardManager.copySensitivePassword(
                                 label = getString(R.string.app_name),
@@ -309,7 +323,7 @@ class AutofillAuthActivity : FragmentActivity() {
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
-                        ) { cancelAutofill() },
+                        ) { dismissAutofill() },
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Surface(
@@ -665,6 +679,12 @@ class AutofillAuthActivity : FragmentActivity() {
                                                             keyboardType = KeyboardType.Number,
                                                             imeAction = ImeAction.Done
                                                         ),
+                                                        keyboardActions = KeyboardActions(
+                                                            onDone = {
+                                                                counterText = counter.toString()
+                                                                focusManager.clearFocus()
+                                                            }
+                                                        ),
                                                         modifier = Modifier
                                                             .width(92.dp)
                                                             .onFocusChanged { focus ->
@@ -734,7 +754,7 @@ class AutofillAuthActivity : FragmentActivity() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                TextButton(onClick = { cancelAutofill() }) {
+                                TextButton(onClick = { dismissAutofill() }) {
                                     Text(stringResource(R.string.action_cancel))
                                 }
                                 Spacer(Modifier.width(6.dp))
