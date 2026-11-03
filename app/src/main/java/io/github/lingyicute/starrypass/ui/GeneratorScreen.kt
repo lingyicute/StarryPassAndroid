@@ -140,6 +140,12 @@ fun GeneratorScreen(
     var justCopied by remember { mutableStateOf(false) }
     var counterText by remember(uiState.counter) { mutableStateOf(uiState.counter.toString()) }
 
+    LaunchedEffect(uiState.master.isEmpty()) {
+        if (uiState.master.isEmpty()) {
+            showMaster = false
+        }
+    }
+
     LaunchedEffect(justCopied) {
         if (justCopied) {
             delay(1_800L)
@@ -238,6 +244,7 @@ fun GeneratorScreen(
                         TextButton(
                             onClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showMaster = false
                                 onResetAll()
                             },
                             enabled = uiState.master.isNotEmpty() || uiState.code.isNotEmpty()
