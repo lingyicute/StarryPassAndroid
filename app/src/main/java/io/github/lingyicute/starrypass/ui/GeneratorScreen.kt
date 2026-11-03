@@ -338,7 +338,7 @@ fun GeneratorScreen(
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.None,
                             autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Ascii,
+                            keyboardType = KeyboardType.Text,
                             imeAction = ImeAction.Done
                         ),
                         keyboardActions = KeyboardActions(
