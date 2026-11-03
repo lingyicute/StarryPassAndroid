@@ -156,4 +156,17 @@ class PreferencesRepositoryTest {
 
         assertEquals(setOf("alpha", "gamma"), repo.presetsFlow.first().map { it.code }.toSet())
     }
+
+    @Test
+    fun `autofill matching normalises domains stored in an older format`() = runBlocking {
+        val file = temporaryFolder.newFile("legacy.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"a","code":"mail","autofillDomain":".Example.com."}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        assertEquals("a", repo.findMatchingPreset("login.example.com", null)?.id)
+    }
 }

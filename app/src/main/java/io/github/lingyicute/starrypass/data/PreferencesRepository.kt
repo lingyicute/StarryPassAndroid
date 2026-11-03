@@ -180,10 +180,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
         if (normDomain != null) {
             // The most specific domain wins; recency (list order) only breaks ties.
-            presets.filter { preset ->
-                val pd = preset.autofillDomain
-                pd.isNotEmpty() && (normDomain == pd || normDomain.endsWith(".$pd"))
-            }.maxByOrNull { it.autofillDomain.length }?.let { return it }
+            // Entries saved by older versions were normalised by older rules; normalise again.
+            presets.mapNotNull { preset ->
+                val pd = normalizeDomain(preset.autofillDomain)
+                if (pd.isNotEmpty() && (normDomain == pd || normDomain.endsWith(".$pd"))) preset to pd else null
+            }.maxByOrNull { (_, pd) -> pd.length }?.let { return it.first }
 
             val domainStem = extractDomainStem(normDomain)
             presets.firstOrNull { preset ->
