@@ -456,7 +456,9 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 } else {
                                                     Icons.Outlined.Visibility
                                                 },
-                                                contentDescription = null
+                                                contentDescription = stringResource(
+                                                    if (showMaster) R.string.field_master_hide else R.string.field_master_show
+                                                )
                                             )
                                         }
                                     }
