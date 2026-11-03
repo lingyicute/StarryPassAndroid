@@ -208,6 +208,17 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     companion object {
+        private val MULTI_PART_TLDS = setOf(
+            "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk",
+            "com.cn", "net.cn", "org.cn", "gov.cn", "edu.cn",
+            "com.hk", "org.hk", "com.tw", "org.tw", "com.sg", "com.my",
+            "co.jp", "ne.jp", "or.jp", "ac.jp", "co.kr", "or.kr",
+            "com.au", "net.au", "org.au", "edu.au", "co.nz",
+            "co.in", "co.id", "co.th", "com.vn", "com.ph", "com.pk",
+            "com.br", "com.mx", "com.ar", "com.co", "com.tr", "com.ua",
+            "co.za", "com.eg", "com.sa"
+        )
+
         fun normalizeDomain(raw: String): String {
             var s = raw.trim().lowercase()
             s = s.removePrefix("https://").removePrefix("http://")
@@ -250,9 +261,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (clean.isEmpty()) return ""
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
-            val multiPartTlds = setOf("co.uk", "org.uk", "com.cn", "net.cn", "org.cn", "com.hk", "com.tw", "co.jp")
             val tail2 = parts.takeLast(2).joinToString(".")
-            return if (parts.size >= 3 && tail2 in multiPartTlds) {
+            return if (parts.size >= 3 && tail2 in MULTI_PART_TLDS) {
                 parts[parts.size - 3]
             } else {
                 parts[parts.size - 2]
