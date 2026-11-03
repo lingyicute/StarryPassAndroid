@@ -268,6 +268,7 @@ fun StarryPassRootScreen(
                         scope.launch {
                             snackbarHostState.showSnackbar(if (ok) copiedMsg else copyFailedMsg)
                         }
+                        ok
                     },
                     onClearClipboardNow = {
                         viewModel.clearClipboardNow()

@@ -127,7 +127,7 @@ fun GeneratorScreen(
     onToggleMaskOutput: () -> Unit,
     onApplyPreset: (SitePreset) -> Unit,
     onSaveCurrentAsPreset: () -> Unit,
-    onCopyClick: () -> Unit,
+    onCopyClick: () -> Boolean,
     onClearClipboardNow: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -735,8 +735,7 @@ fun GeneratorScreen(
                                 Button(
                                     onClick = {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        justCopied = true
-                                        onCopyClick()
+                                        justCopied = onCopyClick()
                                     },
                                     enabled = pwd != null && !uiState.isDeriving,
                                     shape = CircleShape,
