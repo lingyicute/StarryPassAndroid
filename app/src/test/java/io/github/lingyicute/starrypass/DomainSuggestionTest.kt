@@ -71,6 +71,8 @@ class DomainSuggestionTest {
         assertEquals("example.com", PreferencesRepository.normalizeDomain("*.example.com"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain(".*.example.com"))
         assertEquals("example.com", PreferencesRepository.normalizeDomain("*.www.Example.com:443"))
+        assertEquals("", PreferencesRepository.normalizeDomain("*"))
+        assertEquals("", PreferencesRepository.normalizeDomain("*."))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext("*.github.com", null))
     }
 

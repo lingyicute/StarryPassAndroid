@@ -225,7 +225,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
-        val previousCode = presetsState.value.firstOrNull { it.id == preset.id }?.code
+        val cleanId = Spv2Spec.ecmaTrim(preset.id)
+        val previousCode = presetsState.value.firstOrNull { it.id == cleanId }?.code
         val activeCode = Spv2Spec.ecmaTrim(_uiState.value.code)
         val synced = activeCode == cleanCode || (previousCode != null && activeCode == previousCode)
         if (synced) {
@@ -233,7 +234,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             if (!synced) {
-                val storedCode = prefsRepo.presetsFlow.first().firstOrNull { it.id == preset.id }?.code
+                val storedCode = prefsRepo.presetsFlow.first().firstOrNull { it.id == cleanId }?.code
                 if (storedCode != null && Spv2Spec.ecmaTrim(_uiState.value.code) == storedCode) {
                     syncGeneratorPolicy()
                 }

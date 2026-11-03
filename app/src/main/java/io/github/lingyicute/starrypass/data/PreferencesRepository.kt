@@ -97,7 +97,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
     private suspend fun savePreset(preset: SitePreset, policyOnly: Boolean) {
         val cleanCode = Spv2Spec.ecmaTrim(preset.code)
         if (cleanCode.isEmpty()) return
+        val cleanId = Spv2Spec.ecmaTrim(preset.id).ifEmpty { UUID.randomUUID().toString() }
         val normalized = preset.copy(
+            id = cleanId,
             code = cleanCode,
             alias = Spv2Spec.ecmaTrim(preset.alias),
             modeKey = preset.mode.key,
@@ -135,10 +137,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     suspend fun incrementPresetCounter(presetId: String): PresetRotationResult {
+        val cleanId = Spv2Spec.ecmaTrim(presetId)
+        if (cleanId.isEmpty()) return PresetRotationResult.NotFound
         var result: PresetRotationResult = PresetRotationResult.NotFound
         dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
-            val idx = current.indexOfFirst { it.id == presetId }
+            val idx = current.indexOfFirst { it.id == cleanId }
             if (idx >= 0) {
                 val item = current[idx]
                 if (item.counter >= Spv2Spec.MAX_COUNTER) {
@@ -158,9 +162,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     suspend fun deletePreset(presetId: String) {
+        val cleanId = Spv2Spec.ecmaTrim(presetId)
+        if (cleanId.isEmpty()) return
         dataStore.edit { prefs ->
             val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON])
-                .filterNot { it.id == presetId }
+                .filterNot { it.id == cleanId }
             prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
         }
     }
@@ -204,7 +210,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
             presets.mapNotNull { preset ->
                 val codeDomain = normalizeDomain(preset.code)
-                if (codeDomain.contains('.') && (normDomain == codeDomain || normDomain.endsWith(".$codeDomain"))) {
+                if (codeDomain.isNotEmpty() &&
+                    (normDomain == codeDomain || (codeDomain.contains('.') && normDomain.endsWith(".$codeDomain")))
+                ) {
                     preset to codeDomain
                 } else {
                     null
@@ -247,7 +255,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }.getOrNull() ?: return@mapNotNull null
             val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
             if (cleanCode.isEmpty()) return@mapNotNull null
-            val cleanId = Spv2Spec.ecmaTrim(decoded.id).ifEmpty { UUID.randomUUID().toString() }
+            val cleanId = Spv2Spec.ecmaTrim(decoded.id).ifEmpty {
+                UUID.nameUUIDFromBytes(cleanCode.toByteArray(Charsets.UTF_8)).toString()
+            }
             if (!seenIds.add(cleanId) || !seenCodes.add(cleanCode)) return@mapNotNull null
             decoded.copy(
                 id = cleanId,
@@ -318,6 +328,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 s = s.removePrefix("*.").trimStart('.')
             }
             s = s.trimEnd('.')
+            if (s == "*") return ""
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
                 val parts = withoutWww.split('.').filter { it.isNotEmpty() }
