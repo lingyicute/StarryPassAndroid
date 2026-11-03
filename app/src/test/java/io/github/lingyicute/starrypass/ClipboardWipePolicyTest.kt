@@ -24,4 +24,9 @@ class ClipboardWipePolicyTest {
     fun `wipes when a background app cannot read the clipboard`() {
         assertTrue(ClipboardWipePolicy.shouldWipe(expected, false, null))
     }
+
+    @Test
+    fun `keeps an unreadable clip that the user is known to have replaced`() {
+        assertFalse(ClipboardWipePolicy.shouldWipe(expected, false, null, replacedByOther = true))
+    }
 }
