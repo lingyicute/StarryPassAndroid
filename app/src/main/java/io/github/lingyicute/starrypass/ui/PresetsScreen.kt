@@ -77,6 +77,7 @@ import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.Spv2Tier
 import io.github.lingyicute.starrypass.data.PreferencesRepository
 import io.github.lingyicute.starrypass.data.SitePreset
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -101,15 +102,15 @@ fun PresetsScreen(
     }
 
     val filtered = remember(presets, searchQuery) {
-        val q = Spv2Spec.ecmaTrim(searchQuery).lowercase()
+        val q = Spv2Spec.ecmaTrim(searchQuery).lowercase(Locale.ROOT)
         if (q.isEmpty()) {
             presets
         } else {
             presets.filter {
-                it.code.lowercase().contains(q) ||
-                    it.alias.lowercase().contains(q) ||
-                    it.autofillDomain.lowercase().contains(q) ||
-                    it.autofillPackage.lowercase().contains(q)
+                it.code.lowercase(Locale.ROOT).contains(q) ||
+                    it.alias.lowercase(Locale.ROOT).contains(q) ||
+                    it.autofillDomain.lowercase(Locale.ROOT).contains(q) ||
+                    it.autofillPackage.lowercase(Locale.ROOT).contains(q)
             }
         }
     }
