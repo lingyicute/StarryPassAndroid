@@ -359,7 +359,8 @@ fun GeneratorScreen(
                                 val selected = activeTrimmed == preset.code &&
                                     uiState.counter == preset.counter &&
                                     uiState.mode == preset.mode &&
-                                    uiState.length == preset.length
+                                    uiState.length == preset.length &&
+                                    uiState.tier == preset.tier
                                 FilterChip(
                                     selected = selected,
                                     onClick = { onApplyPreset(preset) },
