@@ -100,7 +100,12 @@ class Spv2Engine(
                     currentCoroutineContext().ensureActive()
 
                     val masterBytes = Spv2Spec.normalizeMasterToUtf8(request.master)
-                    val codeBytes = Spv2Spec.normalizeCodeToUtf8(request.code)
+                    val codeBytes = try {
+                        Spv2Spec.normalizeCodeToUtf8(request.code)
+                    } catch (t: Throwable) {
+                        Spv2Spec.zeroize(masterBytes)
+                        throw t
+                    }
                     val counter = Spv2Spec.clampCounter(request.counter)
                     val length = Spv2Spec.clampLength(request.length)
                     val tier = request.tier
@@ -251,14 +256,18 @@ class Spv2Engine(
         codeBytes: ByteArray,
         tierId: Byte
     ): ByteArray {
-        val domain = Spv2Spec.domainCache()
-        val prefixedMaster = Spv2Spec.lenPrefixed(masterBytes)
-        val prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
-        val tierByte = byteArrayOf(tierId)
-        val msg = Spv2Spec.concatBytes(domain, prefixedMaster, prefixedCode, tierByte)
+        var domain: ByteArray? = null
+        var prefixedMaster: ByteArray? = null
+        var prefixedCode: ByteArray? = null
+        var msg: ByteArray? = null
         return try {
+            domain = Spv2Spec.domainCache()
+            prefixedMaster = Spv2Spec.lenPrefixed(masterBytes)
+            prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
+            msg = Spv2Spec.concatBytes(domain, prefixedMaster, prefixedCode, byteArrayOf(tierId))
             Spv2Primitives.hmacSha256(getOrCreateSessionNonceLocked(), msg)
         } finally {
+            // Allocated inside the try so a failure part-way still wipes what already exists.
             Spv2Spec.zeroize(domain)
             Spv2Spec.zeroize(prefixedMaster)
             Spv2Spec.zeroize(prefixedCode)
