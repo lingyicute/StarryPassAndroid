@@ -94,6 +94,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -653,7 +654,12 @@ class AutofillAuthActivity : FragmentActivity() {
                                                             keyboardType = KeyboardType.Number,
                                                             imeAction = ImeAction.Done
                                                         ),
-                                                        modifier = Modifier.width(92.dp)
+                                                        modifier = Modifier
+                                                            .width(92.dp)
+                                                            .onFocusChanged { focus ->
+                                                                // Show the counter actually used, not an invalid entry.
+                                                                if (!focus.isFocused) counterText = counter.toString()
+                                                            }
                                                     )
                                                     FilledTonalIconButton(
                                                         onClick = {
