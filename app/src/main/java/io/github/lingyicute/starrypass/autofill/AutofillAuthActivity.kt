@@ -313,6 +313,7 @@ class AutofillAuthActivity : FragmentActivity() {
                 if (master.isNotEmpty()) {
                     executeDerive(master, copyOnly = copyOnly)
                 } else if (bioEnrolled) {
+                    cancelInFlightDerive()
                     app.biometricVault.unlockMasterPassword(
                         activity = this@AutofillAuthActivity,
                         onSuccess = { unlocked -> executeDerive(unlocked, copyOnly = copyOnly) },
@@ -660,8 +661,11 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 Slider(
                                                     value = length.toFloat(),
                                                     onValueChange = {
-                                                        cancelInFlightDerive()
-                                                        length = it.roundToInt()
+                                                        val rounded = it.roundToInt()
+                                                        if (rounded != length) {
+                                                            cancelInFlightDerive()
+                                                            length = rounded
+                                                        }
                                                     },
                                                     valueRange = Spv2Spec.MIN_LENGTH.toFloat()..Spv2Spec.MAX_LENGTH.toFloat(),
                                                     modifier = Modifier.fillMaxWidth()
@@ -701,7 +705,7 @@ class AutofillAuthActivity : FragmentActivity() {
                                                             val digits = raw.filter { it in '0'..'9' }.take(4)
                                                             counterText = digits
                                                             digits.toIntOrNull()?.let { parsed ->
-                                                                if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER) {
+                                                                if (parsed in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER && parsed != counter) {
                                                                     cancelInFlightDerive()
                                                                     counter = parsed
                                                                 }

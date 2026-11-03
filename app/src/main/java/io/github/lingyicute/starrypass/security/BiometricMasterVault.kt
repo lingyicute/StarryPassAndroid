@@ -172,7 +172,7 @@ class BiometricMasterVault(
                         if (activePrompts.remove(authPrompt) == null || enrollmentOwner !== owner) return
                         val secret = pendingMaster
                         pendingMaster = null
-                        if (!sessionWipes.isCurrent(generation) || secret == null) {
+                        if (!sessionWipes.isCurrent(generation) || secret == null || activity.isFinishing || activity.isDestroyed) {
                             finishEnrollment(discardKey = true)
                             return
                         }
@@ -305,7 +305,7 @@ class BiometricMasterVault(
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         activity.lifecycle.removeObserver(destroyObserver)
-                        if (activePrompts.remove(authPrompt) == null || !sessionWipes.isCurrent(generation)) return
+                        if (activePrompts.remove(authPrompt) == null || !sessionWipes.isCurrent(generation) || activity.isFinishing || activity.isDestroyed) return
                         val unlockedCipher = result.cryptoObject?.cipher
                         if (unlockedCipher == null) {
                             onError(activity.getString(R.string.biometric_err_cipher))
