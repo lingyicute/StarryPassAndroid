@@ -87,6 +87,12 @@ internal class GeneratorDerivationCoordinator(
                 if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
                     state.update { it.copy(derivedPassword = null, isDeriving = false, errorCode = e.code) }
                 }
+            } catch (_: OutOfMemoryError) {
+                if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
+                    state.update {
+                        it.copy(derivedPassword = null, isDeriving = false, errorCode = Spv2ErrorCode.OUT_OF_MEMORY)
+                    }
+                }
             } catch (_: Throwable) {
                 if (seq == sequence && wipeGeneration == currentWipeGeneration()) {
                     state.update {
