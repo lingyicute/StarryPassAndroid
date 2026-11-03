@@ -137,9 +137,11 @@ class Spv2Engine(
                                 val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
                                 DeriveResult(password = pwd, cached = true, elapsedMs = elapsedMs)
                             } else {
-                                val salt = buildSalt(codeBytes, tier.id)
-                                val ad = Spv2Spec.domainAd()
+                                var salt: ByteArray? = null
+                                var ad: ByteArray? = null
                                 val fresh = try {
+                                    salt = buildSalt(codeBytes, tier.id)
+                                    ad = Spv2Spec.domainAd()
                                     // Bouncy Castle Argon2 is synchronous and cannot be interrupted.
                                     Spv2Primitives.argon2id(
                                         password = masterBytes,
@@ -238,11 +240,13 @@ class Spv2Engine(
     }
 
     private fun buildSalt(codeBytes: ByteArray, tierId: Byte): ByteArray {
-        val domain = Spv2Spec.domainSalt()
-        val prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
-        val tierByte = byteArrayOf(tierId)
-        val saltIn = Spv2Spec.concatBytes(domain, prefixedCode, tierByte)
+        var domain: ByteArray? = null
+        var prefixedCode: ByteArray? = null
+        var saltIn: ByteArray? = null
         return try {
+            domain = Spv2Spec.domainSalt()
+            prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
+            saltIn = Spv2Spec.concatBytes(domain, prefixedCode, byteArrayOf(tierId))
             Spv2Primitives.sha256(saltIn)
         } finally {
             Spv2Spec.zeroize(domain)
@@ -282,29 +286,38 @@ class Spv2Engine(
         length: Int,
         mode: Spv2Mode
     ): String {
-        val meta = ByteArray(7)
-        Spv2Spec.writeLE32(meta, 0, counter)
-        Spv2Spec.writeLE16(meta, 4, length and 0xFFFF)
-        meta[6] = mode.id
-
-        val domainExpand = Spv2Spec.domainExpand()
-        val domainExtract = Spv2Spec.domainExtract()
-        val prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
-        val info = Spv2Spec.concatBytes(domainExpand, meta, prefixedCode)
-
-        val stream = Spv2Primitives.HkdfStream(sk = sk, salt = domainExtract, info = info)
+        var meta: ByteArray? = null
+        var domainExpand: ByteArray? = null
+        var domainExtract: ByteArray? = null
+        var prefixedCode: ByteArray? = null
+        var info: ByteArray? = null
+        var stream: Spv2Primitives.HkdfStream? = null
         try {
+            meta = ByteArray(7).also {
+                Spv2Spec.writeLE32(it, 0, counter)
+                Spv2Spec.writeLE16(it, 4, length and 0xFFFF)
+                it[6] = mode.id
+            }
+            domainExpand = Spv2Spec.domainExpand()
+            domainExtract = Spv2Spec.domainExtract()
+            prefixedCode = Spv2Spec.lenPrefixed(codeBytes)
+            info = Spv2Spec.concatBytes(domainExpand, meta, prefixedCode)
+            stream = Spv2Primitives.HkdfStream(sk = sk, salt = domainExtract, info = info)
+
             val pool = mode.pool
             val reqClasses = if (length >= mode.requiredClasses.size) mode.requiredClasses else emptyList()
             var result: String? = null
 
             for (attempt in 0 until Spv2Spec.REJECTION_MAX_ATTEMPTS) {
                 val chars = CharArray(length)
-                for (i in 0 until length) {
-                    chars[i] = pool[stream.uniformInt(pool.length)]
+                val candidate = try {
+                    for (i in 0 until length) {
+                        chars[i] = pool[stream.uniformInt(pool.length)]
+                    }
+                    String(chars)
+                } finally {
+                    Spv2Spec.zeroize(chars)
                 }
-                val candidate = String(chars)
-                Spv2Spec.zeroize(chars)
 
                 var ok = true
                 for (cls in reqClasses) {
@@ -329,21 +342,24 @@ class Spv2Engine(
             if (result == null) {
                 // Deterministic Fisher-Yates fallback identical to upstream spv2-core.mjs
                 val arr = CharArray(length)
-                var idx = 0
-                for (cls in reqClasses) {
-                    arr[idx++] = cls[stream.uniformInt(cls.length)]
+                result = try {
+                    var idx = 0
+                    for (cls in reqClasses) {
+                        arr[idx++] = cls[stream.uniformInt(cls.length)]
+                    }
+                    while (idx < length) {
+                        arr[idx++] = pool[stream.uniformInt(pool.length)]
+                    }
+                    for (s in length - 1 downTo 1) {
+                        val j = stream.uniformInt(s + 1)
+                        val tmp = arr[s]
+                        arr[s] = arr[j]
+                        arr[j] = tmp
+                    }
+                    String(arr)
+                } finally {
+                    Spv2Spec.zeroize(arr)
                 }
-                while (idx < length) {
-                    arr[idx++] = pool[stream.uniformInt(pool.length)]
-                }
-                for (s in length - 1 downTo 1) {
-                    val j = stream.uniformInt(s + 1)
-                    val tmp = arr[s]
-                    arr[s] = arr[j]
-                    arr[j] = tmp
-                }
-                result = String(arr)
-                Spv2Spec.zeroize(arr)
             }
 
             return result
@@ -353,7 +369,7 @@ class Spv2Engine(
             Spv2Spec.zeroize(domainExtract)
             Spv2Spec.zeroize(prefixedCode)
             Spv2Spec.zeroize(info)
-            stream.dispose()
+            stream?.dispose()
         }
     }
 
@@ -365,28 +381,32 @@ class Spv2Engine(
         val s = ByteArray(16) { 2 }
         val k = ByteArray(8) { 3 }
         val x = ByteArray(12) { 4 }
-        val tagK = Spv2Primitives.argon2id(
-            password = p,
-            salt = s,
-            ad = x,
-            secret = k,
-            memoryKiB = 32,
-            passes = 3,
-            parallelism = 4,
-            tagLength = 32
-        )
-        val expectedA2 = byteArrayOf(
-            0x0d, 0x64, 0x0d, 0xf5.toByte(), 0x8d.toByte(), 0x78, 0x76, 0x6c,
-            0x08, 0xc0.toByte(), 0x37, 0xa3.toByte(), 0x4a, 0x8b.toByte(), 0x53, 0xc9.toByte(),
-            0xd0.toByte(), 0x1e, 0xf0.toByte(), 0x45, 0x2d, 0x75, 0xb6.toByte(), 0x5e,
-            0xb5.toByte(), 0x25, 0x20, 0xe9.toByte(), 0x6b, 0x01, 0xe6.toByte(), 0x59
-        )
-        val a2Ok = Spv2Primitives.constantTimeEquals(tagK, expectedA2)
-        Spv2Spec.zeroize(p)
-        Spv2Spec.zeroize(s)
-        Spv2Spec.zeroize(k)
-        Spv2Spec.zeroize(x)
-        Spv2Spec.zeroize(tagK)
+        var tagK: ByteArray? = null
+        val a2Ok = try {
+            tagK = Spv2Primitives.argon2id(
+                password = p,
+                salt = s,
+                ad = x,
+                secret = k,
+                memoryKiB = 32,
+                passes = 3,
+                parallelism = 4,
+                tagLength = 32
+            )
+            val expectedA2 = byteArrayOf(
+                0x0d, 0x64, 0x0d, 0xf5.toByte(), 0x8d.toByte(), 0x78, 0x76, 0x6c,
+                0x08, 0xc0.toByte(), 0x37, 0xa3.toByte(), 0x4a, 0x8b.toByte(), 0x53, 0xc9.toByte(),
+                0xd0.toByte(), 0x1e, 0xf0.toByte(), 0x45, 0x2d, 0x75, 0xb6.toByte(), 0x5e,
+                0xb5.toByte(), 0x25, 0x20, 0xe9.toByte(), 0x6b, 0x01, 0xe6.toByte(), 0x59
+            )
+            Spv2Primitives.constantTimeEquals(tagK, expectedA2)
+        } finally {
+            Spv2Spec.zeroize(p)
+            Spv2Spec.zeroize(s)
+            Spv2Spec.zeroize(k)
+            Spv2Spec.zeroize(x)
+            Spv2Spec.zeroize(tagK)
+        }
         if (!a2Ok) {
             throw Spv2Exception(Spv2ErrorCode.KAT_ARGON2ID_FAILED)
         }
@@ -398,31 +418,38 @@ class Spv2Engine(
             0xf0.toByte(), 0xf1.toByte(), 0xf2.toByte(), 0xf3.toByte(), 0xf4.toByte(),
             0xf5.toByte(), 0xf6.toByte(), 0xf7.toByte(), 0xf8.toByte(), 0xf9.toByte()
         )
-        val prk = Spv2Primitives.hmacSha256(tcSalt, tcIkm)
-        val expectedPrk8 = byteArrayOf(0x07, 0x77, 0x09, 0x36, 0x2c, 0x2e, 0x32, 0xdf.toByte())
-        for (j in 0 until 8) {
-            if (prk[j] != expectedPrk8[j]) {
-                Spv2Spec.zeroize(prk)
-                throw Spv2Exception(Spv2ErrorCode.KAT_SHA256_FAILED)
+        var prk: ByteArray? = null
+        var okm: ByteArray? = null
+        var stream: Spv2Primitives.HkdfStream? = null
+        try {
+            prk = Spv2Primitives.hmacSha256(tcSalt, tcIkm)
+            val expectedPrk8 = byteArrayOf(0x07, 0x77, 0x09, 0x36, 0x2c, 0x2e, 0x32, 0xdf.toByte())
+            for (j in 0 until 8) {
+                if (prk[j] != expectedPrk8[j]) {
+                    throw Spv2Exception(Spv2ErrorCode.KAT_SHA256_FAILED)
+                }
             }
-        }
-        Spv2Spec.zeroize(prk)
 
-        val stream = Spv2Primitives.HkdfStream(sk = tcIkm, salt = tcSalt, info = tcInfo)
-        val okm = ByteArray(42) { stream.nextUnsignedByte().toByte() }
-        stream.dispose()
-        val expectedOkm = byteArrayOf(
-            0x3c, 0xb2.toByte(), 0x5f, 0x25, 0xfa.toByte(), 0xac.toByte(), 0xd5.toByte(), 0x7a,
-            0x90.toByte(), 0x43, 0x4f, 0x64, 0xd0.toByte(), 0x36, 0x2f, 0x2a,
-            0x2d, 0x2d, 0x0a, 0x90.toByte(), 0xcf.toByte(), 0x1a, 0x5a, 0x4c,
-            0x5d, 0xb0.toByte(), 0x2d, 0x56, 0xec.toByte(), 0xc4.toByte(), 0xc5.toByte(), 0xbf.toByte(),
-            0x34, 0x00, 0x72, 0x08, 0xd5.toByte(), 0xb8.toByte(), 0x87.toByte(), 0x18,
-            0x58, 0x65
-        )
-        val hkdfOk = Spv2Primitives.constantTimeEquals(okm, expectedOkm)
-        Spv2Spec.zeroize(okm)
-        if (!hkdfOk) {
-            throw Spv2Exception(Spv2ErrorCode.KAT_HKDF_FAILED)
+            stream = Spv2Primitives.HkdfStream(sk = tcIkm, salt = tcSalt, info = tcInfo)
+            okm = ByteArray(42) { stream.nextUnsignedByte().toByte() }
+            val expectedOkm = byteArrayOf(
+                0x3c, 0xb2.toByte(), 0x5f, 0x25, 0xfa.toByte(), 0xac.toByte(), 0xd5.toByte(), 0x7a,
+                0x90.toByte(), 0x43, 0x4f, 0x64, 0xd0.toByte(), 0x36, 0x2f, 0x2a,
+                0x2d, 0x2d, 0x0a, 0x90.toByte(), 0xcf.toByte(), 0x1a, 0x5a, 0x4c,
+                0x5d, 0xb0.toByte(), 0x2d, 0x56, 0xec.toByte(), 0xc4.toByte(), 0xc5.toByte(), 0xbf.toByte(),
+                0x34, 0x00, 0x72, 0x08, 0xd5.toByte(), 0xb8.toByte(), 0x87.toByte(), 0x18,
+                0x58, 0x65
+            )
+            if (!Spv2Primitives.constantTimeEquals(okm, expectedOkm)) {
+                throw Spv2Exception(Spv2ErrorCode.KAT_HKDF_FAILED)
+            }
+        } finally {
+            stream?.dispose()
+            Spv2Spec.zeroize(tcSalt)
+            Spv2Spec.zeroize(tcIkm)
+            Spv2Spec.zeroize(tcInfo)
+            Spv2Spec.zeroize(prk)
+            Spv2Spec.zeroize(okm)
         }
 
         selfTestPassed = true
