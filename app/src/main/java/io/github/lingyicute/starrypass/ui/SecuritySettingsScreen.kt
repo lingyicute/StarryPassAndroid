@@ -502,7 +502,9 @@ private fun BiometricEnrollDialog(
                         IconButton(onClick = { visible = !visible }) {
                             Icon(
                                 imageVector = if (visible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                                contentDescription = null
+                                contentDescription = stringResource(
+                                    if (visible) R.string.field_master_hide else R.string.field_master_show
+                                )
                             )
                         }
                     },
