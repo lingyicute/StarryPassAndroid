@@ -103,7 +103,9 @@ class BiometricMasterVault(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        if (activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        if (activity.supportFragmentManager.isStateSaved) {
+            onError(activity.getString(R.string.biometric_err_not_ready))
             return
         }
         if (masterPassword.isEmpty()) {
@@ -252,9 +254,11 @@ class BiometricMasterVault(
         onSuccess: (String) -> Unit,
         onError: (String) -> Unit
     ) {
+        if (activity.isFinishing || activity.isDestroyed) return
         if (enrollmentOwner != null || activePrompts.isNotEmpty() ||
-            activity.isFinishing || activity.isDestroyed || activity.supportFragmentManager.isStateSaved
+            activity.supportFragmentManager.isStateSaved
         ) {
+            onError(activity.getString(R.string.biometric_err_not_ready))
             return
         }
         val ivB64 = prefs.getString(PREF_IV, null)
