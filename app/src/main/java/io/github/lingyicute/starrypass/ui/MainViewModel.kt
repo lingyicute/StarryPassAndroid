@@ -263,7 +263,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setClipboardAutoClearSeconds(seconds: Int) {
-        viewModelScope.launch { prefsRepo.setClipboardAutoClearSeconds(seconds) }
+        val coerced = seconds.coerceAtLeast(0)
+        clipboardManager.onAutoClearTimeoutChanged(coerced)
+        viewModelScope.launch { prefsRepo.setClipboardAutoClearSeconds(coerced) }
     }
 
     fun setColorizePassword(enabled: Boolean) {

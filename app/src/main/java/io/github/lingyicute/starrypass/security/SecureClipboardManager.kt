@@ -79,6 +79,19 @@ class SecureClipboardManager(context: Context) {
         lastCopiedSha256 = null
     }
 
+    fun onAutoClearTimeoutChanged(seconds: Int) {
+        if (clearJob?.isActive != true) return
+        if (seconds <= 0) {
+            clearJob?.cancel()
+            clearJob = null
+            _remainingSeconds.value = 0
+            Spv2Spec.zeroize(lastCopiedSha256)
+            lastCopiedSha256 = null
+        } else if (_remainingSeconds.value > seconds) {
+            scheduleAutoClear(seconds)
+        }
+    }
+
     private fun scheduleAutoClear(seconds: Int) {
         clearJob?.cancel()
         if (seconds <= 0) {
