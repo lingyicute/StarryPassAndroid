@@ -122,4 +122,40 @@ class Spv2CancellationTest {
             }
         }
     }
+
+    @Test
+    fun `cancelling an uncommitted cache hit does not erase the cache while the initial request succeeds`() = runBlocking {
+        workerDispatcher().use { dispatcher ->
+            val engine = Spv2Engine(dispatcher)
+            engine.runSelfTest()
+            val scheduler1 = TestCoroutineScheduler()
+            val scheduler2 = TestCoroutineScheduler()
+            val caller1 = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler1))
+            val caller2 = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler2))
+            try {
+                val request = DeriveRequest("a private master", "example", length = 16)
+                val first = caller1.async { engine.derive(request) }
+                scheduler1.runCurrent()
+                awaitArgon2()
+                awaitWorkerIdle()
+
+                val second = caller2.async { engine.derive(request.copy(length = 20)) }
+                scheduler2.runCurrent()
+                awaitWorkerIdle()
+
+                // Cancel the second (cache-hit) caller first while the first caller is still pending completion.
+                second.cancel()
+                scheduler2.advanceUntilIdle()
+                assertTrue(second.isCompleted)
+
+                // Now let the first caller complete normally; the session cache must remain committed.
+                scheduler1.advanceUntilIdle()
+                assertFalse(first.await().cached)
+                assertTrue(engine.derive(request.copy(length = 24)).cached)
+            } finally {
+                caller1.cancel()
+                caller2.cancel()
+            }
+        }
+    }
 }
