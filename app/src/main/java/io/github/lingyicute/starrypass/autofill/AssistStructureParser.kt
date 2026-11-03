@@ -125,7 +125,7 @@ internal object AssistStructureParser {
         passwordIds: MutableList<AutofillId>,
         allEditableIds: MutableList<AutofillId>
     ) {
-        val dom = node.webDomain?.takeIf { it.isNotBlank() }
+        val dom = node.webDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() }
         if (dom != null) {
             onDomain(dom)
         }
@@ -163,7 +163,7 @@ internal object AssistStructureParser {
         if (!htmlTag.isNullOrEmpty()) {
             if (htmlTag.equals("input", ignoreCase = true)) {
                 val typeAttr = node.htmlInfo?.attributes
-                    ?.firstOrNull { it.first.equals("type", ignoreCase = true) }
+                    ?.firstOrNull { it.first?.let(Spv2Spec::ecmaTrim)?.equals("type", ignoreCase = true) == true }
                     ?.second
                     ?.let(Spv2Spec::ecmaTrim)
                     ?.lowercase()
@@ -178,19 +178,23 @@ internal object AssistStructureParser {
         // 1. Explicit Android autofillHints
         val hints = node.autofillHints
         if (!hints.isNullOrEmpty()) {
-            if (hints.any { hint ->
-                    hint == View.AUTOFILL_HINT_PASSWORD ||
+            val cleanHints = hints.mapNotNull { it?.let(Spv2Spec::ecmaTrim)?.takeIf(String::isNotEmpty) }
+            if (cleanHints.any { hint ->
+                    hint.equals(View.AUTOFILL_HINT_PASSWORD, ignoreCase = true) ||
                         hint.contains("password", ignoreCase = true) ||
                         hint.equals("newPassword", ignoreCase = true)
                 }
             ) {
                 return true
             }
-            if (hints.any { hint ->
-                    hint == View.AUTOFILL_HINT_USERNAME ||
-                        hint == View.AUTOFILL_HINT_EMAIL_ADDRESS ||
-                        hint == View.AUTOFILL_HINT_PHONE ||
-                        hint == View.AUTOFILL_HINT_NAME
+            if (cleanHints.any { hint ->
+                    hint.equals(View.AUTOFILL_HINT_USERNAME, ignoreCase = true) ||
+                        hint.equals(View.AUTOFILL_HINT_EMAIL_ADDRESS, ignoreCase = true) ||
+                        hint.equals("email", ignoreCase = true) ||
+                        hint.equals(View.AUTOFILL_HINT_PHONE, ignoreCase = true) ||
+                        hint.equals(View.AUTOFILL_HINT_NAME, ignoreCase = true) ||
+                        hint.equals("one-time-code", ignoreCase = true) ||
+                        hint.contains("otp", ignoreCase = true)
                 }
             ) {
                 return false
@@ -211,7 +215,7 @@ internal object AssistStructureParser {
                 }
                 if (attrName == "autocomplete") {
                     if (attrVal.contains("password")) return true
-                    val tokens = attrVal.split(' ').filter { it.isNotEmpty() }
+                    val tokens = attrVal.split(Regex("\\s+")).filter { it.isNotEmpty() }
                     if (tokens.any { it in NON_PASSWORD_AUTOCOMPLETE_TOKENS }) {
                         explicitNonPasswordHtml = true
                     }

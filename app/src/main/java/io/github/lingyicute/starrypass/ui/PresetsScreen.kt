@@ -231,7 +231,7 @@ fun PresetsScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             color = colorScheme.onSurface
                                         )
-                                        if (preset.alias.isNotBlank()) {
+                                        if (Spv2Spec.ecmaTrim(preset.alias).isNotEmpty()) {
                                             Text(
                                                 text = stringResource(R.string.autofill_prompt_subtitle_code, preset.code),
                                                 style = MaterialTheme.typography.bodySmall,
