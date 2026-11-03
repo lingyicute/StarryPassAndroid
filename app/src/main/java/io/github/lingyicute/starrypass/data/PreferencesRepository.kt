@@ -223,6 +223,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             "co.za", "com.eg", "com.sa"
         )
 
+        private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
 
         fun normalizeDomain(raw: String): String {
@@ -271,6 +272,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         fun extractDomainStem(domain: String): String {
             val clean = normalizeDomain(domain)
             if (clean.isEmpty()) return ""
+            // An IP address has no registrable name; its last octet would be a meaningless code.
+            if (IPV4_ADDRESS.matches(clean)) return clean
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
             val tail2 = parts.takeLast(2).joinToString(".")
