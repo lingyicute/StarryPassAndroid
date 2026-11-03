@@ -11,6 +11,7 @@ import android.view.View
 import android.view.autofill.AutofillId
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.data.PreferencesRepository
+import java.util.Locale
 
 internal data class ParsedAutofillStructure(
     val passwordIds: List<AutofillId>,
@@ -80,6 +81,24 @@ internal object AssistStructureParser {
         "one-time-code"
     )
 
+    private val NON_PASSWORD_FIELD_KEYWORDS = listOf(
+        "username",
+        "user_name",
+        "email",
+        "e-mail",
+        "phone",
+        "mobile",
+        "otp",
+        "one-time",
+        "verification",
+        "captcha",
+        "用户名",
+        "账号",
+        "邮箱",
+        "手机",
+        "验证码"
+    )
+
     fun parse(structure: AssistStructure): ParsedAutofillStructure {
         val passwordIds = mutableListOf<AutofillId>()
         val allEditableIds = mutableListOf<AutofillId>()
@@ -102,7 +121,11 @@ internal object AssistStructureParser {
                         if (dom != null) focusedDomain = dom
                     }
                 },
-                onPasswordDomain = { dom -> if (passwordDomain == null && dom != null) passwordDomain = dom },
+                onPasswordDomain = { dom, isFocused ->
+                    if (dom != null && (passwordDomain == null || isFocused)) {
+                        passwordDomain = dom
+                    }
+                },
                 passwordIds = passwordIds,
                 allEditableIds = allEditableIds
             )
@@ -122,7 +145,7 @@ internal object AssistStructureParser {
         inheritedDomain: String?,
         onDomain: (String) -> Unit,
         onFocusedEditable: (AutofillId, String?) -> Unit,
-        onPasswordDomain: (String?) -> Unit,
+        onPasswordDomain: (String?, Boolean) -> Unit,
         passwordIds: MutableList<AutofillId>,
         allEditableIds: MutableList<AutofillId>
     ) {
@@ -142,7 +165,7 @@ internal object AssistStructureParser {
             }
             if (isPasswordNode(node)) {
                 passwordIds.add(autofillId)
-                onPasswordDomain(activeDomain)
+                onPasswordDomain(activeDomain, node.isFocused)
             }
         }
 
@@ -166,8 +189,8 @@ internal object AssistStructureParser {
         if (!htmlTag.isNullOrEmpty()) {
             val attrs = node.htmlInfo?.attributes
             if (attrs?.any { attr ->
-                    val name = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase()
-                    val value = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase()
+                    val name = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
+                    val value = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
                     (name == "disabled" || name == "readonly") && value != "false"
                 } == true
             ) {
@@ -178,7 +201,7 @@ internal object AssistStructureParser {
                     ?.firstOrNull { it.first?.let(Spv2Spec::ecmaTrim)?.equals("type", ignoreCase = true) == true }
                     ?.second
                     ?.let(Spv2Spec::ecmaTrim)
-                    ?.lowercase()
+                    ?.lowercase(Locale.ROOT)
                 return typeAttr.isNullOrEmpty() || typeAttr in HTML_TEXT_INPUT_TYPES
             }
             return htmlTag.equals("textarea", ignoreCase = true)
@@ -221,8 +244,8 @@ internal object AssistStructureParser {
         val htmlAttrs = node.htmlInfo?.attributes
         if (htmlAttrs != null) {
             for (attr in htmlAttrs) {
-                val attrName = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase() ?: continue
-                val attrVal = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase() ?: continue
+                val attrName = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
+                val attrVal = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
                 if (attrName == "type") {
                     if (attrVal == "password") return true
                     if (attrVal in NON_PASSWORD_HTML_TYPES) explicitNonPasswordHtml = true
@@ -234,10 +257,12 @@ internal object AssistStructureParser {
                         explicitNonPasswordHtml = true
                     }
                 }
-                if ((attrName == "name" || attrName == "id" || attrName == "placeholder") &&
-                    PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }
-                ) {
-                    htmlKeywordMatched = true
+                if (attrName == "name" || attrName == "id" || attrName == "placeholder") {
+                    if (NON_PASSWORD_FIELD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
+                        explicitNonPasswordHtml = true
+                    } else if (PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
+                        htmlKeywordMatched = true
+                    }
                 }
             }
         }
@@ -275,9 +300,15 @@ internal object AssistStructureParser {
         }
 
         // 4. Resource idEntry, hint text, or contentDescription heuristics
-        val idEntry = node.idEntry?.lowercase().orEmpty()
-        val hintText = node.hint?.lowercase().orEmpty()
-        val contentDesc = node.contentDescription?.toString()?.lowercase().orEmpty()
+        val idEntry = node.idEntry?.lowercase(Locale.ROOT).orEmpty()
+        val hintText = node.hint?.lowercase(Locale.ROOT).orEmpty()
+        val contentDesc = node.contentDescription?.toString()?.lowercase(Locale.ROOT).orEmpty()
+        if (NON_PASSWORD_FIELD_KEYWORDS.any { kw ->
+                idEntry.contains(kw) || hintText.contains(kw) || contentDesc.contains(kw)
+            }
+        ) {
+            return false
+        }
         if (PASSWORD_KEYWORDS.any { kw ->
                 idEntry.contains(kw) || hintText.contains(kw) || contentDesc.contains(kw)
             }
