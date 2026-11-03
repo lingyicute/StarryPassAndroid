@@ -24,6 +24,16 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `recognizes country second-level suffixes missing from the explicit list`() {
+        assertEquals("example", PreferencesRepository.extractDomainStem("login.example.org.nz"))
+        assertEquals("example", PreferencesRepository.extractDomainStem("shop.example.gov.in"))
+        assertEquals("example", PreferencesRepository.extractDomainStem("www.example.go.jp"))
+        assertEquals("id", PreferencesRepository.extractDomainStem("login.id.me"))
+        assertEquals("example", PreferencesRepository.extractDomainStem("a.example.com"))
+        assertEquals("co", PreferencesRepository.extractDomainStem("co.uk"))
+    }
+
+    @Test
     fun `keeps IPv4 addresses whole instead of using the last octet as the site code`() {
         assertEquals("192.168.1.1", PreferencesRepository.suggestCodeFromContext("http://192.168.1.1:8080/login", null))
         assertEquals("192.168.1.1", PreferencesRepository.extractDomainStem("192.168.1.1"))

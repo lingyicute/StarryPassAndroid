@@ -224,6 +224,13 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             "co.za", "com.eg", "com.sa"
         )
 
+        // Second-level labels that country registries commonly delegate (`example.org.nz`,
+        // `example.gov.in`); this covers suffixes missing from the explicit list above.
+        private val GENERIC_SECOND_LEVEL = setOf(
+            "ac", "co", "com", "edu", "go", "gob", "gov", "mil", "ne", "net", "or", "org",
+            "ltd", "plc", "sch"
+        )
+
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
 
@@ -279,7 +286,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
             val tail2 = parts.takeLast(2).joinToString(".")
-            return if (parts.size >= 3 && tail2 in MULTI_PART_TLDS) {
+            val multiPartSuffix = parts.size >= 3 && (
+                tail2 in MULTI_PART_TLDS ||
+                    (parts.last().length == 2 && parts[parts.size - 2] in GENERIC_SECOND_LEVEL)
+                )
+            return if (multiPartSuffix) {
                 parts[parts.size - 3]
             } else {
                 parts[parts.size - 2]
