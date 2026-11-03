@@ -211,10 +211,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         fun normalizeDomain(raw: String): String {
             var s = raw.trim().lowercase()
             s = s.removePrefix("https://").removePrefix("http://")
-            val slash = s.indexOf('/')
-            if (slash >= 0) s = s.substring(0, slash)
+            val end = s.indexOfAny(charArrayOf('/', '?', '#'))
+            if (end >= 0) s = s.substring(0, end)
+            s = s.substringAfterLast('@')
             val colon = s.indexOf(':')
             if (colon >= 0) s = s.substring(0, colon)
+            s = s.trimEnd('.')
             s = s.removePrefix("www.")
             return s
         }

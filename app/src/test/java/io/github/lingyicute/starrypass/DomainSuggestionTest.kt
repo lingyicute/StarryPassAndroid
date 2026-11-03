@@ -21,6 +21,14 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `normalizes domains that carry credentials, query, fragment, port or a trailing dot`() {
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("https://User:pw@WWW.Example.com.:8443/a?b#c"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("example.com?next=/home"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("example.com#login"))
+        assertEquals("sub.example.com", PreferencesRepository.normalizeDomain("sub.example.com./"))
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")
