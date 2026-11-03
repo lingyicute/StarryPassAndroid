@@ -32,6 +32,16 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `normalizes domains with any URL scheme, protocol-relative prefix or IPv6 literal`() {
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("ftp://example.com/files"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("HTTPS://Example.com"))
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("//www.example.com/login"))
+        assertEquals("localhost", PreferencesRepository.normalizeDomain("localhost:8080"))
+        assertEquals("[::1]", PreferencesRepository.normalizeDomain("http://[::1]:8080/path"))
+        assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("[2001:db8::1]"))
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")

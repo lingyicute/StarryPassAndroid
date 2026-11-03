@@ -223,14 +223,22 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             "co.za", "com.eg", "com.sa"
         )
 
+        private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
+
         fun normalizeDomain(raw: String): String {
             var s = raw.trim().lowercase()
-            s = s.removePrefix("https://").removePrefix("http://")
+            s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
             val end = s.indexOfAny(charArrayOf('/', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
             s = s.substringAfterLast('@')
-            val colon = s.indexOf(':')
-            if (colon >= 0) s = s.substring(0, colon)
+            if (s.startsWith("[")) {
+                // IPv6 literal: its colons are part of the host, only a port may follow the bracket.
+                val close = s.indexOf(']')
+                if (close >= 0) s = s.substring(0, close + 1)
+            } else {
+                val colon = s.indexOf(':')
+                if (colon >= 0) s = s.substring(0, colon)
+            }
             s = s.trimEnd('.')
             s = s.removePrefix("www.")
             return s
