@@ -1,6 +1,7 @@
 package io.github.lingyicute.starrypass
 
 import io.github.lingyicute.starrypass.crypto.DeriveResult
+import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
 import io.github.lingyicute.starrypass.security.SessionWipeSignal
 import io.github.lingyicute.starrypass.ui.GeneratorDerivationCoordinator
 import io.github.lingyicute.starrypass.ui.GeneratorUiState
@@ -97,5 +98,21 @@ class GeneratorDerivationCoordinatorTest {
         assertNull(state.value.derivedPassword)
         assertFalse(state.value.isDeriving)
         assertFalse(called)
+    }
+
+    @Test
+    fun `raw OutOfMemoryError maps to OUT_OF_MEMORY error code`() = runTest {
+        val state = MutableStateFlow(GeneratorUiState(master = "master", code = "site"))
+        val coordinator = GeneratorDerivationCoordinator(
+            scope = this,
+            state = state,
+            derive = { throw OutOfMemoryError("heap exhausted") },
+            isSelfTestVerified = { true }
+        )
+        coordinator.updateInputs(0) { it.copy(length = 20) }
+        runCurrent()
+        assertNull(state.value.derivedPassword)
+        assertFalse(state.value.isDeriving)
+        assertEquals(Spv2ErrorCode.OUT_OF_MEMORY, state.value.errorCode)
     }
 }
