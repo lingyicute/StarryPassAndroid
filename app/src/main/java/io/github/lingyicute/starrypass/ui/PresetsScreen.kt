@@ -274,6 +274,12 @@ fun PresetsScreen(
                                             label = { Text(preset.autofillDomain) }
                                         )
                                     }
+                                    if (preset.autofillPackage.isNotEmpty()) {
+                                        AssistChip(
+                                            onClick = { onUsePreset(preset) },
+                                            label = { Text(preset.autofillPackage) }
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -388,7 +394,11 @@ private fun PresetEditDialog(
                     Spv2Mode.entries.forEachIndexed { idx, m ->
                         SegmentedButton(
                             selected = mode == m,
-                            onClick = { mode = m },
+                            onClick = {
+                                if (m == Spv2Mode.PIN && length > 8) length = 6
+                                else if (mode == Spv2Mode.PIN && m != Spv2Mode.PIN && length <= 8) length = 16
+                                mode = m
+                            },
                             shape = SegmentedButtonDefaults.itemShape(idx, Spv2Mode.entries.size)
                         ) {
                             Text(modeLabelText(m), maxLines = 1)
@@ -413,14 +423,14 @@ private fun PresetEditDialog(
                             onClick = { tier = Spv2Tier.STANDARD },
                             shape = SegmentedButtonDefaults.itemShape(0, 2)
                         ) {
-                            Text("64 MiB", maxLines = 1)
+                            Text(tierShortLabelText(Spv2Tier.STANDARD), maxLines = 1)
                         }
                         SegmentedButton(
                             selected = tier == Spv2Tier.PARANOID,
                             onClick = { tier = Spv2Tier.PARANOID },
                             shape = SegmentedButtonDefaults.itemShape(1, 2)
                         ) {
-                            Text("256 MiB", maxLines = 1)
+                            Text(tierShortLabelText(Spv2Tier.PARANOID), maxLines = 1)
                         }
                     }
                 }
