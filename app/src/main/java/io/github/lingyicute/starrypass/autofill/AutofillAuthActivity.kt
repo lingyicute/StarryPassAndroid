@@ -109,6 +109,8 @@ import androidx.fragment.app.FragmentActivity
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.crypto.DeriveRequest
+import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
+import io.github.lingyicute.starrypass.crypto.Spv2Exception
 import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.Spv2Tier
@@ -259,7 +261,12 @@ class AutofillAuthActivity : FragmentActivity() {
                     } catch (e: Throwable) {
                         if (app.sessionWipes.isCurrent(generation)) {
                             busy = false
-                            errorMsg = e.localizedMessage ?: getString(R.string.error_derive_generic)
+                            // Never surface raw enum names such as OUT_OF_MEMORY to the user.
+                            val outOfMemory = e is OutOfMemoryError ||
+                                (e as? Spv2Exception)?.code == Spv2ErrorCode.OUT_OF_MEMORY
+                            errorMsg = getString(
+                                if (outOfMemory) R.string.error_derive_oom else R.string.error_derive_generic
+                            )
                         }
                     }
                 }
