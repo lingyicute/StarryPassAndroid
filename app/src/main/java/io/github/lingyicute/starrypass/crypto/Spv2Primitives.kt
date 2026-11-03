@@ -42,14 +42,17 @@ internal object Spv2Primitives {
     fun hmacSha256(keyBytes: ByteArray, dataBytes: ByteArray): ByteArray {
         val mac = Mac.getInstance("HmacSHA256")
         val keySpec = SecretKeySpec(keyBytes, "HmacSHA256")
-        mac.init(keySpec)
-        val out = mac.doFinal(dataBytes)
-        try {
-            keySpec.destroy()
-        } catch (_: Throwable) {
-            // SecretKeySpec.destroy() is optional on older Android API levels.
+        return try {
+            mac.init(keySpec)
+            mac.doFinal(dataBytes)
+        } finally {
+            runCatching { mac.reset() }
+            try {
+                keySpec.destroy()
+            } catch (_: Throwable) {
+                // SecretKeySpec.destroy() is optional on older Android API levels.
+            }
         }
-        return out
     }
 
     fun constantTimeEquals(a: ByteArray?, b: ByteArray?): Boolean {
@@ -73,31 +76,39 @@ internal object Spv2Primitives {
         tagLength: Int = Spv2Spec.SESSION_KEY_BYTES
     ): ByteArray {
         val builder = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
-            .withVersion(Argon2Parameters.ARGON2_VERSION_13)
-            .withSalt(salt)
-            .withMemoryAsKB(memoryKiB)
-            .withIterations(passes)
-            .withParallelism(parallelism)
-
-        if (ad != null && ad.isNotEmpty()) {
-            builder.withAdditional(ad)
-        }
-        if (secret != null && secret.isNotEmpty()) {
-            builder.withSecret(secret)
-        }
-
-        val params = builder.build()
+        var params: Argon2Parameters? = null
+        var out: ByteArray? = null
+        var completed = false
         try {
-            val out = ByteArray(tagLength)
+            builder
+                .withVersion(Argon2Parameters.ARGON2_VERSION_13)
+                .withSalt(salt)
+                .withMemoryAsKB(memoryKiB)
+                .withIterations(passes)
+                .withParallelism(parallelism)
+
+            if (ad != null && ad.isNotEmpty()) {
+                builder.withAdditional(ad)
+            }
+            if (secret != null && secret.isNotEmpty()) {
+                builder.withSecret(secret)
+            }
+
+            params = builder.build()
+            out = ByteArray(tagLength)
             val generator = Argon2BytesGenerator()
             generator.init(params)
             generator.generateBytes(password, out, 0, tagLength)
+            completed = true
             return out
         } catch (oom: OutOfMemoryError) {
             throw Spv2Exception(Spv2ErrorCode.OUT_OF_MEMORY, "OUT_OF_MEMORY", oom)
         } finally {
+            if (!completed) {
+                Spv2Spec.zeroize(out)
+            }
             builder.clear()
-            params.clear()
+            params?.clear()
         }
     }
 
