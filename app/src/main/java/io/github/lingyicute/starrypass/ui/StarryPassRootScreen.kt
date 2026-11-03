@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -85,6 +86,8 @@ fun StarryPassRootScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    // Re-queried on resume: users may enroll a fingerprint in system settings and come back.
+    var biometricHardwareStatus by remember { mutableStateOf(viewModel.queryBiometricHardware()) }
 
     ScreenSecurityEffect(flagSecureEnabled = settings.flagSecure)
 
@@ -304,7 +307,7 @@ fun StarryPassRootScreen(
                     settings = settings,
                     katVerified = uiState.katVerified,
                     biometricEnrolled = biometricEnrolled,
-                    biometricHardwareStatus = viewModel.queryBiometricHardware(),
+                    biometricHardwareStatus = biometricHardwareStatus,
                     currentMasterDraft = uiState.master,
                     sessionWipes = (activity.application as StarryPassApp).sessionWipes,
                     onDynamicColorChange = viewModel::setDynamicColor,
@@ -329,7 +332,10 @@ fun StarryPassRootScreen(
                         viewModel.biometricVault.clearVault()
                         scope.launch { snackbarHostState.showSnackbar(bioRevokedMsg) }
                     },
-                    onRefreshBiometric = { viewModel.biometricVault.refreshState() },
+                    onRefreshBiometric = {
+                        viewModel.biometricVault.refreshState()
+                        biometricHardwareStatus = viewModel.queryBiometricHardware()
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
