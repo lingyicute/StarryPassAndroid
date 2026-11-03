@@ -158,4 +158,21 @@ class Spv2CancellationTest {
             }
         }
     }
+
+    @Test
+    fun `cancelling a new site derivation during Argon2 preserves the previously committed cache`() = runBlocking {
+        workerDispatcher().use { dispatcher ->
+            val engine = Spv2Engine(dispatcher)
+            engine.runSelfTest()
+            val committed = DeriveRequest("a private master", "alpha", length = 16)
+            assertFalse(engine.derive(committed).cached)
+
+            val otherSite = DeriveRequest("a private master", "beta", length = 16)
+            val pending = async { engine.derive(otherSite) }
+            awaitArgon2()
+            pending.cancelAndJoin()
+
+            assertTrue(engine.derive(committed.copy(length = 20)).cached)
+        }
+    }
 }

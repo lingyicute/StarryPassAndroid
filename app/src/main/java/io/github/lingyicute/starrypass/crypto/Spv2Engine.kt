@@ -115,12 +115,13 @@ class Spv2Engine(
                         try {
                             val existingTag = cachedTag
                             val existingSk = cachedSk
-                            val sk: ByteArray
-                            val usedCache: Boolean
-
-                            if (existingTag != null && existingSk != null &&
+                            val usedCache = existingTag != null && existingSk != null &&
                                 Spv2Primitives.constantTimeEquals(reqTag, existingTag)
-                            ) {
+
+                            if (usedCache) {
+                                currentCoroutineContext().ensureActive()
+                                Spv2Spec.zeroize(masterBytes)
+                                val pwd = synthesizePassword(existingSk!!, codeBytes, counter, length, mode)
                                 currentCoroutineContext().ensureActive()
                                 // Track every in-flight caller using an uncommitted cache entry.
                                 synchronized(cacheStateLock) {
@@ -128,8 +129,8 @@ class Spv2Engine(
                                         uncommittedOwners.add(owner)
                                     }
                                 }
-                                sk = existingSk
-                                usedCache = true
+                                val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
+                                DeriveResult(password = pwd, cached = true, elapsedMs = elapsedMs)
                             } else {
                                 val salt = buildSalt(codeBytes, tier.id)
                                 val ad = Spv2Spec.domainAd()
@@ -152,6 +153,9 @@ class Spv2Engine(
                                 try {
                                     // Do not publish work that finished after its caller was cancelled.
                                     currentCoroutineContext().ensureActive()
+                                    Spv2Spec.zeroize(masterBytes)
+                                    val pwd = synthesizePassword(fresh, codeBytes, counter, length, mode)
+                                    currentCoroutineContext().ensureActive()
                                     clearCachedKeyLocked()
                                     cachedSk = fresh
                                     cachedTag = reqTag
@@ -159,18 +163,12 @@ class Spv2Engine(
                                         uncommittedOwners.add(owner)
                                     }
                                     tagTransferred = true
-                                    sk = fresh
-                                    usedCache = false
+                                    val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
+                                    DeriveResult(password = pwd, cached = false, elapsedMs = elapsedMs)
                                 } finally {
                                     if (!tagTransferred) Spv2Spec.zeroize(fresh)
                                 }
                             }
-
-                            Spv2Spec.zeroize(masterBytes)
-                            val pwd = synthesizePassword(sk, codeBytes, counter, length, mode)
-                            currentCoroutineContext().ensureActive()
-                            val elapsedMs = (System.nanoTime() - t0) / 1_000_000L
-                            DeriveResult(password = pwd, cached = usedCache, elapsedMs = elapsedMs)
                         } finally {
                             if (!tagTransferred) Spv2Spec.zeroize(reqTag)
                         }
