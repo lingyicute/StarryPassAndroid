@@ -230,10 +230,38 @@ class PreferencesRepositoryTest {
         repo.upsertPreset(preset)
 
         val saved = repo.presetsFlow.first().single()
+        assertEquals("id-domain", saved.id)
         assertEquals("", saved.alias)
         assertEquals("github.com", saved.displayName)
         assertEquals("com.github.android", saved.autofillPackage)
         assertEquals(saved.id, repo.findMatchingPreset("https://sso.github.com/login", null)?.id)
         assertEquals(saved.id, repo.findMatchingPreset(null, "\uFEFFcom.github.android\u00A0")?.id)
+
+        // Renaming via the original untrimmed preset reference must update in place rather than drop the edit.
+        repo.upsertPreset(preset.copy(code = "gitlab.com"))
+        val renamed = repo.presetsFlow.first().single()
+        assertEquals("id-domain", renamed.id)
+        assertEquals("gitlab.com", renamed.code)
+    }
+
+    @Test
+    fun `matches IPv6 and non-dotted host codes and keeps blank stored ids deterministic`() = runBlocking {
+        val file = temporaryFolder.newFile("ipv6_and_blank_id.preferences_pb")
+        val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
+        dataStore.edit {
+            it[stringPreferencesKey("site_presets_json")] =
+                """[{"id":"  ","code":"::1","counter":2},{"id":"local","code":"http://localhost:8080"}]"""
+        }
+        val repo = PreferencesRepository(dataStore)
+
+        val ipv6Preset = repo.findMatchingPreset("http://[::1]:8080/login", null)!!
+        assertEquals("::1", ipv6Preset.code)
+        assertEquals(ipv6Preset.id, repo.presetsFlow.first().first { it.code == "::1" }.id)
+
+        val rotated = repo.incrementPresetCounter(ipv6Preset.id) as PresetRotationResult.Updated
+        assertEquals(3, rotated.preset.counter)
+
+        val localhostPreset = repo.findMatchingPreset("http://localhost:3000/login", null)!!
+        assertEquals("local", localhostPreset.id)
     }
 }
