@@ -58,12 +58,22 @@ internal object AssistStructureParser {
         var detectedDomain: String? = null
         val pkgName = structure.activityComponent?.packageName
 
+        var focusedDomain: String? = null
+        var passwordDomain: String? = null
+
         for (i in 0 until structure.windowNodeCount) {
             val root = structure.getWindowNodeAt(i).rootViewNode
             traverseNode(
                 node = root,
+                inheritedDomain = null,
                 onDomain = { dom -> if (detectedDomain == null) detectedDomain = dom },
-                onFocusedEditable = { id -> if (focusedEditableId == null) focusedEditableId = id },
+                onFocusedEditable = { id, dom ->
+                    if (focusedEditableId == null) {
+                        focusedEditableId = id
+                        if (dom != null) focusedDomain = dom
+                    }
+                },
+                onPasswordDomain = { dom -> if (passwordDomain == null && dom != null) passwordDomain = dom },
                 passwordIds = passwordIds,
                 allEditableIds = allEditableIds
             )
@@ -73,39 +83,45 @@ internal object AssistStructureParser {
             passwordIds = passwordIds.distinct(),
             focusedEditableId = focusedEditableId,
             allEditableIds = allEditableIds.distinct(),
-            webDomain = detectedDomain,
+            webDomain = focusedDomain ?: passwordDomain ?: detectedDomain,
             packageName = pkgName
         )
     }
 
     private fun traverseNode(
         node: AssistStructure.ViewNode,
+        inheritedDomain: String?,
         onDomain: (String) -> Unit,
-        onFocusedEditable: (AutofillId) -> Unit,
+        onFocusedEditable: (AutofillId, String?) -> Unit,
+        onPasswordDomain: (String?) -> Unit,
         passwordIds: MutableList<AutofillId>,
         allEditableIds: MutableList<AutofillId>
     ) {
-        val dom = node.webDomain
-        if (!dom.isNullOrBlank()) {
+        val dom = node.webDomain?.takeIf { it.isNotBlank() }
+        if (dom != null) {
             onDomain(dom)
         }
+        val activeDomain = dom ?: inheritedDomain
 
         val autofillId = node.autofillId
         if (autofillId != null && isFillableTextInput(node)) {
             allEditableIds.add(autofillId)
             if (node.isFocused) {
-                onFocusedEditable(autofillId)
+                onFocusedEditable(autofillId, activeDomain)
             }
             if (isPasswordNode(node)) {
                 passwordIds.add(autofillId)
+                onPasswordDomain(activeDomain)
             }
         }
 
         for (c in 0 until node.childCount) {
             traverseNode(
                 node = node.getChildAt(c),
+                inheritedDomain = activeDomain,
                 onDomain = onDomain,
                 onFocusedEditable = onFocusedEditable,
+                onPasswordDomain = onPasswordDomain,
                 passwordIds = passwordIds,
                 allEditableIds = allEditableIds
             )
@@ -113,16 +129,17 @@ internal object AssistStructureParser {
     }
 
     private fun isFillableTextInput(node: AssistStructure.ViewNode): Boolean {
-        if (node.autofillType == View.AUTOFILL_TYPE_TEXT) return true
-        // Some WebViews / hybrid engines expose <input> via htmlInfo while leaving autofillType == NONE
+        // Inspect HTML <input> type first so <input type="hidden|submit|button|..."> is never treated as text input
+        // even when a WebView reports autofillType == AUTOFILL_TYPE_TEXT.
         val htmlTag = node.htmlInfo?.tag
         if (htmlTag != null && htmlTag.equals("input", ignoreCase = true)) {
             val typeAttr = node.htmlInfo?.attributes
                 ?.firstOrNull { it.first.equals("type", ignoreCase = true) }
                 ?.second
                 ?.lowercase()
-            return typeAttr == null || typeAttr in setOf("password", "text", "tel", "number", "email", "search")
+            return typeAttr == null || typeAttr in setOf("password", "text", "tel", "number", "email", "search", "url")
         }
+        if (node.autofillType == View.AUTOFILL_TYPE_TEXT) return true
         val className = node.className.orEmpty()
         return node.autofillType != View.AUTOFILL_TYPE_NONE &&
             (className.contains("EditText", ignoreCase = true) || node.inputType != 0)
