@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 
 private val Context.starryPassDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "starrypass_preferences",
@@ -59,14 +60,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     val presetsFlow: Flow<List<SitePreset>> = dataStore.data.map { prefs ->
-        val raw = prefs[Keys.SITE_PRESETS_JSON]
-        if (raw.isNullOrBlank()) {
-            emptyList()
-        } else {
-            runCatching { json.decodeFromString<List<SitePreset>>(raw) }
-                .getOrDefault(emptyList())
-                .sortedByDescending { it.updatedAtEpochMs }
-        }
+        decodePresets(prefs[Keys.SITE_PRESETS_JSON]).sortedByDescending { it.updatedAtEpochMs }
     }
 
     suspend fun setTheme(theme: ThemePreference) {
@@ -207,9 +201,17 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         return null
     }
 
+    /**
+     * Decodes entries one by one: a single unreadable preset must not hide the others, nor make
+     * the next save overwrite the whole stored list with only the new entry.
+     */
     private fun decodePresets(raw: String?): List<SitePreset> {
         if (raw.isNullOrBlank()) return emptyList()
-        return runCatching { json.decodeFromString<List<SitePreset>>(raw) }.getOrDefault(emptyList())
+        val array = runCatching { json.parseToJsonElement(raw) as? JsonArray }.getOrNull()
+            ?: return emptyList()
+        return array.mapNotNull { element ->
+            runCatching { json.decodeFromJsonElement(SitePreset.serializer(), element) }.getOrNull()
+        }
     }
 
     companion object {
