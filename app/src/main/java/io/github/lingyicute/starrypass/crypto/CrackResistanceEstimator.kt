@@ -8,6 +8,7 @@
 package io.github.lingyicute.starrypass.crypto
 
 import java.text.Normalizer
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.roundToInt
@@ -117,8 +118,8 @@ object CrackResistanceEstimator {
             return StrengthEstimate(level = 0, bits = 0, reason = StrengthReason.EMPTY)
         }
 
-        val mLower = m.lowercase()
-        val cLower = c.lowercase()
+        val mLower = m.lowercase(Locale.ROOT)
+        val cLower = c.lowercase(Locale.ROOT)
         if (cLower.length >= 2 && mLower.contains(cLower)) {
             return StrengthEstimate(level = 1, bits = 16, reason = StrengthReason.WEAK_CONTAINS_CODE)
         }
@@ -176,7 +177,7 @@ object CrackResistanceEstimator {
         }
 
         val rounded = bits.roundToInt()
-        if (mode == Spv2Mode.PIN && length <= 8) {
+        if (mode == Spv2Mode.PIN && Spv2Spec.clampLength(length) <= 8) {
             return if (bits < 44.0) {
                 StrengthEstimate(level = 1, bits = rounded, reason = StrengthReason.WEAK_SHORT_FOR_PIN)
             } else {
