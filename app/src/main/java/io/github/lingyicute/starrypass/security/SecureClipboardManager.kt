@@ -85,8 +85,6 @@ class SecureClipboardManager(context: Context) {
             clearJob?.cancel()
             clearJob = null
             _remainingSeconds.value = 0
-            Spv2Spec.zeroize(lastCopiedSha256)
-            lastCopiedSha256 = null
         } else if (_remainingSeconds.value > seconds) {
             scheduleAutoClear(seconds)
         }
@@ -94,10 +92,9 @@ class SecureClipboardManager(context: Context) {
 
     private fun scheduleAutoClear(seconds: Int) {
         clearJob?.cancel()
+        clearJob = null
         if (seconds <= 0) {
             _remainingSeconds.value = 0
-            Spv2Spec.zeroize(lastCopiedSha256)
-            lastCopiedSha256 = null
             return
         }
         clearJob = scope.launch {
