@@ -70,9 +70,13 @@ class SecureClipboardManager(context: Context) {
         clearJob?.cancel()
         clearJob = null
         _remainingSeconds.value = 0
+        // Same rule as the timer: do not destroy something the user copied after the password.
+        val expectedHash = lastCopiedSha256
+        if (expectedHash == null || shouldWipeNow(expectedHash)) {
+            wipeSystemClipboard()
+        }
         Spv2Spec.zeroize(lastCopiedSha256)
         lastCopiedSha256 = null
-        wipeSystemClipboard()
     }
 
     private fun scheduleAutoClear(seconds: Int) {
