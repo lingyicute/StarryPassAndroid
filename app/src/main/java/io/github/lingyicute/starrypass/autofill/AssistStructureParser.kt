@@ -9,6 +9,7 @@ import android.app.assist.AssistStructure
 import android.text.InputType
 import android.view.View
 import android.view.autofill.AutofillId
+import io.github.lingyicute.starrypass.crypto.Spv2Spec
 
 internal data class ParsedAutofillStructure(
     val passwordIds: List<AutofillId>,
@@ -49,6 +50,33 @@ internal object AssistStructureParser {
         "new-password",
         "密码",
         "口令"
+    )
+
+    private val HTML_TEXT_INPUT_TYPES = setOf(
+        "password",
+        "text",
+        "tel",
+        "number",
+        "email",
+        "search",
+        "url"
+    )
+
+    private val NON_PASSWORD_HTML_TYPES = setOf(
+        "email",
+        "search",
+        "url"
+    )
+
+    private val NON_PASSWORD_AUTOCOMPLETE_TOKENS = setOf(
+        "username",
+        "email",
+        "tel",
+        "url",
+        "name",
+        "given-name",
+        "family-name",
+        "one-time-code"
     )
 
     fun parse(structure: AssistStructure): ParsedAutofillStructure {
@@ -129,62 +157,94 @@ internal object AssistStructureParser {
     }
 
     private fun isFillableTextInput(node: AssistStructure.ViewNode): Boolean {
-        // Inspect HTML <input> type first so <input type="hidden|submit|button|..."> is never treated as text input
-        // even when a WebView reports autofillType == AUTOFILL_TYPE_TEXT.
-        val htmlTag = node.htmlInfo?.tag
-        if (htmlTag != null && htmlTag.equals("input", ignoreCase = true)) {
-            val typeAttr = node.htmlInfo?.attributes
-                ?.firstOrNull { it.first.equals("type", ignoreCase = true) }
-                ?.second
-                ?.lowercase()
-            return typeAttr == null || typeAttr in setOf("password", "text", "tel", "number", "email", "search", "url")
+        // Inspect HTML tag first so <input type="hidden|submit|button|..."> or <select>/<button>
+        // is never treated as text input even when a WebView reports autofillType == AUTOFILL_TYPE_TEXT.
+        val htmlTag = node.htmlInfo?.tag?.let(Spv2Spec::ecmaTrim)
+        if (!htmlTag.isNullOrEmpty()) {
+            if (htmlTag.equals("input", ignoreCase = true)) {
+                val typeAttr = node.htmlInfo?.attributes
+                    ?.firstOrNull { it.first.equals("type", ignoreCase = true) }
+                    ?.second
+                    ?.let(Spv2Spec::ecmaTrim)
+                    ?.lowercase()
+                return typeAttr.isNullOrEmpty() || typeAttr in HTML_TEXT_INPUT_TYPES
+            }
+            return htmlTag.equals("textarea", ignoreCase = true)
         }
-        if (node.autofillType == View.AUTOFILL_TYPE_TEXT) return true
-        val className = node.className.orEmpty()
-        return node.autofillType != View.AUTOFILL_TYPE_NONE &&
-            (className.contains("EditText", ignoreCase = true) || node.inputType != 0)
+        return node.autofillType == View.AUTOFILL_TYPE_TEXT
     }
 
     private fun isPasswordNode(node: AssistStructure.ViewNode): Boolean {
         // 1. Explicit Android autofillHints
         val hints = node.autofillHints
-        if (!hints.isNullOrEmpty() && hints.any { hint ->
-                hint == View.AUTOFILL_HINT_PASSWORD ||
-                    hint.contains("password", ignoreCase = true) ||
-                    hint.equals("newPassword", ignoreCase = true)
+        if (!hints.isNullOrEmpty()) {
+            if (hints.any { hint ->
+                    hint == View.AUTOFILL_HINT_PASSWORD ||
+                        hint.contains("password", ignoreCase = true) ||
+                        hint.equals("newPassword", ignoreCase = true)
+                }
+            ) {
+                return true
             }
-        ) {
-            return true
+            if (hints.any { hint ->
+                    hint == View.AUTOFILL_HINT_USERNAME ||
+                        hint == View.AUTOFILL_HINT_EMAIL_ADDRESS ||
+                        hint == View.AUTOFILL_HINT_PHONE ||
+                        hint == View.AUTOFILL_HINT_NAME
+                }
+            ) {
+                return false
+            }
         }
 
         // 2. HTML <input> attributes in browsers / WebViews
+        var explicitNonPasswordHtml = false
+        var htmlKeywordMatched = false
         val htmlAttrs = node.htmlInfo?.attributes
         if (htmlAttrs != null) {
             for (attr in htmlAttrs) {
-                val attrName = attr.first?.lowercase() ?: continue
-                val attrVal = attr.second?.lowercase() ?: continue
-                if (attrName == "type" && attrVal == "password") return true
-                if (attrName == "autocomplete" && attrVal.contains("password")) return true
+                val attrName = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase() ?: continue
+                val attrVal = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase() ?: continue
+                if (attrName == "type") {
+                    if (attrVal == "password") return true
+                    if (attrVal in NON_PASSWORD_HTML_TYPES) explicitNonPasswordHtml = true
+                }
+                if (attrName == "autocomplete") {
+                    if (attrVal.contains("password")) return true
+                    val tokens = attrVal.split(' ').filter { it.isNotEmpty() }
+                    if (tokens.any { it in NON_PASSWORD_AUTOCOMPLETE_TOKENS }) {
+                        explicitNonPasswordHtml = true
+                    }
+                }
                 if ((attrName == "name" || attrName == "id" || attrName == "placeholder") &&
                     PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }
                 ) {
-                    return true
+                    htmlKeywordMatched = true
                 }
             }
         }
+        if (explicitNonPasswordHtml) return false
+        if (htmlKeywordMatched) return true
 
         // 3. Android InputType flags (covers hidden & visible password toggles and numeric PIN inputs)
         val inputType = node.inputType
         if (inputType != 0) {
             val variation = inputType and InputType.TYPE_MASK_VARIATION
             val klass = inputType and InputType.TYPE_MASK_CLASS
-            if (klass == InputType.TYPE_CLASS_TEXT && (
-                    variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                        variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
-                        variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-                    )
-            ) {
-                return true
+            if (klass == InputType.TYPE_CLASS_TEXT) {
+                if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                    variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                    variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                ) {
+                    return true
+                }
+                if (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                    variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+                    variation == InputType.TYPE_TEXT_VARIATION_URI ||
+                    variation == InputType.TYPE_TEXT_VARIATION_PERSON_NAME
+                ) {
+                    return false
+                }
             }
             if (klass == InputType.TYPE_CLASS_NUMBER &&
                 variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
