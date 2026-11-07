@@ -191,10 +191,18 @@ class BiometricMasterVault(
                                 finishEnrollment(discardKey = true)
                                 return
                             }
-                            prefs.edit()
+                            // Write synchronously: reporting success before the blob is on disk
+                            // would leave a hardware key without its ciphertext after a crash.
+                            val persisted = prefs.edit()
                                 .putString(PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
                                 .putString(PREF_CT, Base64.encodeToString(ct, Base64.NO_WRAP))
-                                .apply()
+                                .commit()
+                            if (!persisted) {
+                                prefs.edit().clear().commit()
+                                finishEnrollment(discardKey = true)
+                                onError(activity.getString(R.string.biometric_err_persist))
+                                return
+                            }
                             _isEnrolled.value = true
                             finishEnrollment(discardKey = false)
                             onSuccess()
@@ -373,7 +381,8 @@ class BiometricMasterVault(
      */
     fun clearVault() {
         cancelPendingAuthentication()
-        prefs.edit().clear().apply()
+        // Commit before deleting the key so a crash cannot leave ciphertext without its key.
+        prefs.edit().clear().commit()
         runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (ks.containsAlias(KEY_ALIAS)) {
