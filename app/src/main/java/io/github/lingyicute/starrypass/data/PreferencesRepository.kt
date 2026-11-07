@@ -19,6 +19,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
@@ -93,9 +94,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         )
     }
 
-    val presetsFlow: Flow<List<SitePreset>> = safeData.map { prefs ->
-        decodePresets(prefs[Keys.SITE_PRESETS_JSON]).sortedByDescending { it.updatedAtEpochMs }
-    }
+    // Unrelated setting changes re-emit the whole snapshot; only re-decode when the JSON changed.
+    val presetsFlow: Flow<List<SitePreset>> = safeData
+        .map { prefs -> prefs[Keys.SITE_PRESETS_JSON] }
+        .distinctUntilChanged()
+        .map { raw -> decodePresets(raw).sortedByDescending { it.updatedAtEpochMs } }
 
     suspend fun setTheme(theme: ThemePreference) {
         dataStore.edit { it[Keys.THEME] = theme.storageKey }
