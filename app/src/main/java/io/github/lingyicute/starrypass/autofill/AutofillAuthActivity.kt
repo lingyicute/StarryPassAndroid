@@ -165,7 +165,14 @@ class AutofillAuthActivity : FragmentActivity() {
         // Prefer fresh AutofillIds parsed from the live AssistStructure (critical for Chrome/WebView virtual nodes),
         // falling back cleanly to EXTRA_PASSWORD_IDS passed from StarryPassAutofillService.
         val targetIds: List<AutofillId> = liveStructure
-            ?.let { AssistStructureParser.parse(it).resolveTargetIds(isManualRequest) }
+            ?.let {
+                // A malformed live structure must not crash the sheet; use the service's ids instead.
+                try {
+                    AssistStructureParser.parse(it).resolveTargetIds(isManualRequest)
+                } catch (_: RuntimeException) {
+                    null
+                }
+            }
             ?.takeIf { it.isNotEmpty() }
             ?: fallbackIds
 

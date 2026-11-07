@@ -63,7 +63,13 @@ class StarryPassAutofillService : AutofillService() {
         }
 
         val isManualRequest = (request.flags and FillRequest.FLAG_MANUAL_REQUEST) != 0
-        val parsed = AssistStructureParser.parse(latestStructure)
+        // A malformed structure must not leave the framework waiting for its fill timeout.
+        val parsed = try {
+            AssistStructureParser.parse(latestStructure)
+        } catch (_: RuntimeException) {
+            callback.onSuccess(null)
+            return
+        }
         val targetIds = parsed.resolveTargetIds(isManualRequest)
 
         // Never offer autofill inside StarryPass itself or when no targetable input field exists
