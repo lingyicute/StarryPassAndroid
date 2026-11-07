@@ -18,12 +18,14 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import java.io.File
+import java.io.IOException
 import java.util.Locale
 import java.util.UUID
 
@@ -74,7 +76,13 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val SITE_PRESETS_JSON = stringPreferencesKey("site_presets_json")
     }
 
-    val settingsFlow: Flow<AppSettings> = dataStore.data.map { prefs ->
+    // An unreadable file (IOException) must not propagate to collectors, including the app-scoped
+    // wipe observer that would crash the process. Fall back to defaults; they fail closed.
+    private val safeData: Flow<Preferences> = dataStore.data.catch { e ->
+        if (e is IOException) emit(emptyPreferences()) else throw e
+    }
+
+    val settingsFlow: Flow<AppSettings> = safeData.map { prefs ->
         AppSettings(
             theme = ThemePreference.fromKey(prefs[Keys.THEME]),
             dynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true,
@@ -85,7 +93,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         )
     }
 
-    val presetsFlow: Flow<List<SitePreset>> = dataStore.data.map { prefs ->
+    val presetsFlow: Flow<List<SitePreset>> = safeData.map { prefs ->
         decodePresets(prefs[Keys.SITE_PRESETS_JSON]).sortedByDescending { it.updatedAtEpochMs }
     }
 
