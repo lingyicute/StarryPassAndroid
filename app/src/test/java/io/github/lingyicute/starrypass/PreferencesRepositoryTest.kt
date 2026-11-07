@@ -1,8 +1,11 @@
 package io.github.lingyicute.starrypass
 
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.github.lingyicute.starrypass.data.AppSettings
 import io.github.lingyicute.starrypass.data.PreferencesRepository
 import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.SitePreset
@@ -12,13 +15,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.IOException
 
 class PreferencesRepositoryTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
@@ -30,6 +36,19 @@ class PreferencesRepositoryTest {
     }
 
     @After fun cleanUp() = scope.cancel()
+
+    @Test
+    fun `unreadable datastore falls back to defaults instead of failing collectors`() = runBlocking {
+        val failing = object : DataStore<Preferences> {
+            override val data: Flow<Preferences> = flow { throw IOException("disk unavailable") }
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                throw IOException("disk unavailable")
+        }
+        val repo = PreferencesRepository(failing)
+
+        assertEquals(AppSettings(), repo.settingsFlow.first())
+        assertEquals(emptyList<SitePreset>(), repo.presetsFlow.first())
+    }
 
     @Test
     fun `quick save preserves metadata while full editor can explicitly clear it`() = runBlocking {
