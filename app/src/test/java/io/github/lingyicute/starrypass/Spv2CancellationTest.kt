@@ -2,7 +2,11 @@ package io.github.lingyicute.starrypass
 
 import io.github.lingyicute.starrypass.crypto.DeriveRequest
 import io.github.lingyicute.starrypass.crypto.Spv2Engine
-import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -22,9 +26,24 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class Spv2CancellationTest {
     @Volatile private var worker: Thread? = null
+    private val submitted = AtomicInteger()
+    private val finished = AtomicInteger()
 
-    private fun workerDispatcher() = Executors.newSingleThreadExecutor { task ->
-        Thread(task, "spv2-cancel-test").also { worker = it }
+    // Counts tasks handed to the worker and tasks it has completely run, so "idle" means that
+    // every submitted task (including the hand-off of its result to the caller) has finished.
+    private fun workerDispatcher() = object : ThreadPoolExecutor(
+        1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue(),
+        ThreadFactory { task -> Thread(task, "spv2-cancel-test").also { worker = it } }
+    ) {
+        override fun execute(command: Runnable) {
+            submitted.incrementAndGet()
+            super.execute(command)
+        }
+
+        override fun afterExecute(r: Runnable?, t: Throwable?) {
+            finished.incrementAndGet()
+            super.afterExecute(r, t)
+        }
     }.asCoroutineDispatcher()
 
     private suspend fun awaitArgon2() = withTimeout(10_000) {
@@ -32,8 +51,9 @@ class Spv2CancellationTest {
     }
 
     private suspend fun awaitWorkerIdle() = withTimeout(10_000) {
-        // Called only after observing Argon2, so WAITING means the completed result was dispatched.
-        while (worker?.state != Thread.State.WAITING) delay(1)
+        // Every task submitted so far has run to completion, so its result is already queued
+        // for (or discarded by) the caller's dispatcher.
+        while (finished.get() < submitted.get()) delay(1)
     }
 
     @Test
