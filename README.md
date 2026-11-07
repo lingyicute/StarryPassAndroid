@@ -1,5 +1,7 @@
 # 星愿令 StarryPass for Android
 
+**简体中文** | [English](./README.en.md)
+
 > **规范一个字节不变，原语 100% 源自经审计的标准密码学库。**  
 > 在网页版 StarryPass v2 / v2.1 派生出的每一个密码，在本 Android 客户端上都 **逐字节完全一致**。
 
