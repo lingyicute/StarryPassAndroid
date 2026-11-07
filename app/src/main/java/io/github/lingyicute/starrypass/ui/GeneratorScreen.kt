@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -701,13 +700,13 @@ fun GeneratorScreen(
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 } else {
-                                    SelectionContainer {
-                                        Text(
-                                            text = annotated,
-                                            style = PasswordMonoTextStyle,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
+                                    // Not selectable: the system copy action would bypass the
+                                    // sensitive-clip flag and the auto-clear timer.
+                                    Text(
+                                        text = annotated,
+                                        style = PasswordMonoTextStyle,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
                             } else {
                                 val placeholderText = when {
