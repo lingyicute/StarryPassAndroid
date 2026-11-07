@@ -84,6 +84,8 @@ class DomainSuggestionTest {
         assertEquals("", PreferencesRepository.normalizeDomain("cafe.de:80:80"))
         assertEquals("", PreferencesRepository.normalizeDomain(":::"))
         assertEquals("", PreferencesRepository.normalizeDomain("1:2"))
+        assertEquals("", PreferencesRepository.normalizeDomain("10.0.0"))
+        assertEquals("1.example.com", PreferencesRepository.normalizeDomain("1.example.com"))
         assertEquals("", PreferencesRepository.normalizeDomain("example.com:"))
         assertEquals("", PreferencesRepository.normalizeDomain("[::1]:"))
         assertEquals("", PreferencesRepository.normalizeDomain("http:"))

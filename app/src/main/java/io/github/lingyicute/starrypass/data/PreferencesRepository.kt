@@ -455,7 +455,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (s.indexOfAny(charArrayOf('[', ']', '*')) >= 0) return ""
                 val labels = s.split('.')
                 if (labels.any { it.isEmpty() || it.startsWith('-') || it.endsWith('-') }) return ""
-                if (IPV4_ADDRESS.matches(s) && !isValidIpv4Literal(s)) return ""
+                // Digits and dots only is an IPv4 literal; anything else (`1`, `1.2`, `999.1.1.1`) is not a host.
+                if (s.all { it in '0'..'9' || it == '.' } && !isValidIpv4Literal(s)) return ""
             }
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
