@@ -10,6 +10,7 @@ import io.github.lingyicute.starrypass.crypto.DeriveRequest
 import io.github.lingyicute.starrypass.crypto.DeriveResult
 import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
 import io.github.lingyicute.starrypass.crypto.Spv2Exception
+import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.StrengthEstimate
 import io.github.lingyicute.starrypass.crypto.StrengthReason
@@ -49,6 +50,16 @@ internal class GeneratorDerivationCoordinator(
             a.counter == b.counter &&
             a.tier == b.tier
 
+    private fun isShortPin(s: GeneratorUiState): Boolean =
+        s.mode == Spv2Mode.PIN && Spv2Spec.clampLength(s.length) <= 8
+
+    private fun sameStrengthInputs(a: GeneratorUiState, b: GeneratorUiState): Boolean =
+        a.master == b.master &&
+            a.code == b.code &&
+            a.tier == b.tier &&
+            a.mode == b.mode &&
+            isShortPin(a) == isShortPin(b)
+
     fun updateInputs(debounceMs: Long, change: (GeneratorUiState) -> GeneratorUiState) {
         val current = state.value
         val candidate = change(current)
@@ -85,10 +96,13 @@ internal class GeneratorDerivationCoordinator(
         val snapshot = state.updateAndGet { previous ->
             val next = change(previous)
             val ready = next.master.isNotEmpty() && Spv2Spec.ecmaTrim(next.code).isNotEmpty()
-            val strength = if (ready) {
-                CrackResistanceEstimator.estimate(next.master, next.code, next.tier, next.mode, next.length)
-            } else {
-                StrengthEstimate(0, 0, StrengthReason.EMPTY)
+            val strength = when {
+                !ready -> StrengthEstimate(0, 0, StrengthReason.EMPTY)
+                // Counter and most length changes cannot alter the estimate; skip the UI-thread rescoring.
+                previous.strength.reason != StrengthReason.EMPTY && sameStrengthInputs(previous, next) ->
+                    previous.strength
+                else ->
+                    CrackResistanceEstimator.estimate(next.master, next.code, next.tier, next.mode, next.length)
             }
             next.copy(
                 derivedPassword = null,
