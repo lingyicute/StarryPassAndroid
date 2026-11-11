@@ -69,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.crypto.Spv2Mode
@@ -160,6 +161,18 @@ fun PresetsScreen(
                     placeholder = { Text(stringResource(R.string.presets_search_hint)) },
                     leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (presets.isNotEmpty() && filtered.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.presets_no_results),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp)
                 )
             }
 
