@@ -76,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -143,6 +144,7 @@ fun GeneratorScreen(
 
     var showMaster by rememberSaveable { mutableStateOf(false) }
     var justCopied by remember { mutableStateOf(false) }
+    var copyFeedbackKey by remember { mutableIntStateOf(0) }
     var counterText by remember(uiState.counter) { mutableStateOf(uiState.counter.toString()) }
 
     LaunchedEffect(uiState.master.isEmpty()) {
@@ -155,7 +157,9 @@ fun GeneratorScreen(
         justCopied = false
     }
 
-    LaunchedEffect(justCopied) {
+    // Keyed on every successful copy, so a repeated copy restarts the full feedback window
+    // instead of inheriting the remainder of the previous one.
+    LaunchedEffect(copyFeedbackKey) {
         if (justCopied) {
             delay(1_800L)
             justCopied = false
@@ -746,6 +750,7 @@ fun GeneratorScreen(
                                     onClick = {
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         justCopied = onCopyClick()
+                                        if (justCopied) copyFeedbackKey++
                                     },
                                     enabled = pwd != null && !uiState.isDeriving,
                                     shape = CircleShape,
