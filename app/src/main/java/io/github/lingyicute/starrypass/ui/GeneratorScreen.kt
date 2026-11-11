@@ -75,6 +75,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -107,6 +108,9 @@ import io.github.lingyicute.starrypass.ui.theme.PasswordMonoTextStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
+
+private val PIN_QUICK_LENGTHS = listOf(4, 6, 8, 12)
+private val DEFAULT_QUICK_LENGTHS = listOf(12, 16, 20, 24, 32)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -329,28 +333,31 @@ fun GeneratorScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             val activeTrimmed = Spv2Spec.ecmaTrim(uiState.code)
-                            presets.take(12).forEach { preset ->
+                            val visiblePresets = remember(presets) { presets.take(12) }
+                            visiblePresets.forEach { preset ->
                                 val selected = activeTrimmed == preset.code &&
                                     uiState.counter == preset.counter &&
                                     uiState.mode == preset.mode &&
                                     uiState.length == preset.length &&
                                     uiState.tier == preset.tier
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = {
-                                        counterText = Spv2Spec.clampCounter(preset.counter).toString()
-                                        onApplyPreset(preset)
-                                    },
-                                    label = {
-                                        Text(
-                                            if (preset.counter > 1) {
-                                                "${preset.displayName} #${preset.counter}"
-                                            } else {
-                                                preset.displayName
-                                            }
-                                        )
-                                    }
-                                )
+                                key(preset.id) {
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = {
+                                            counterText = Spv2Spec.clampCounter(preset.counter).toString()
+                                            onApplyPreset(preset)
+                                        },
+                                        label = {
+                                            Text(
+                                                if (preset.counter > 1) {
+                                                    "${preset.displayName} #${preset.counter}"
+                                                } else {
+                                                    preset.displayName
+                                                }
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -422,9 +429,9 @@ fun GeneratorScreen(
                                         )
                                         Spacer(Modifier.height(6.dp))
                                         val quickLengths = if (uiState.mode == Spv2Mode.PIN) {
-                                            listOf(4, 6, 8, 12)
+                                            PIN_QUICK_LENGTHS
                                         } else {
-                                            listOf(12, 16, 20, 24, 32)
+                                            DEFAULT_QUICK_LENGTHS
                                         }
                                         FlowRow(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -647,27 +654,32 @@ fun GeneratorScreen(
                             // Password text or placeholder
                             val pwd = uiState.derivedPassword
                             if (pwd != null) {
-                                val annotated = buildColorizedPassword(
-                                    password = pwd,
-                                    colorize = colorizePassword,
-                                    masked = uiState.maskOutput,
-                                    colorScheme = colorScheme
-                                )
-                                if (uiState.maskOutput) {
-                                    Text(
-                                        text = annotated,
-                                        style = PasswordMonoTextStyle,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                } else {
-                                    // Not selectable: the system copy action would bypass the
-                                    // sensitive-clip flag and the auto-clear timer.
-                                    Text(
-                                        text = annotated,
-                                        style = PasswordMonoTextStyle,
-                                        modifier = Modifier.fillMaxWidth()
+                                // Key on the resolved colours, not on `colorScheme`: M3 hands out one
+                                // long-lived ColorScheme instance and mutates it in place, so keying on
+                                // the instance would keep stale colours after a theme change.
+                                val annotated = remember(
+                                    pwd,
+                                    colorizePassword,
+                                    uiState.maskOutput,
+                                    colorScheme.primary,
+                                    colorScheme.onSurface,
+                                    colorScheme.onSurfaceVariant,
+                                    colorScheme.tertiary
+                                ) {
+                                    buildColorizedPassword(
+                                        password = pwd,
+                                        colorize = colorizePassword,
+                                        masked = uiState.maskOutput,
+                                        colorScheme = colorScheme
                                     )
                                 }
+                                // Not selectable: the system copy action would bypass the
+                                // sensitive-clip flag and the auto-clear timer.
+                                Text(
+                                    text = annotated,
+                                    style = PasswordMonoTextStyle,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             } else {
                                 val placeholderText = when {
                                     uiState.errorCode == Spv2ErrorCode.OUT_OF_MEMORY ->
@@ -905,10 +917,7 @@ private fun StrengthMeterBar(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for (i in 1..4) {
-                val barColor by animateColorAsState(
-                    targetValue = if (i <= filledBars) activeColor else colorScheme.surfaceContainerHighest,
-                    label = "strengthBar$i"
-                )
+                val barColor = if (i <= filledBars) activeColor else colorScheme.surfaceContainerHighest
                 Box(
                     modifier = Modifier
                         .width(24.dp)
