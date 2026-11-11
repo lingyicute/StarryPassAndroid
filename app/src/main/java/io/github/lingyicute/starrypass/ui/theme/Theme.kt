@@ -19,7 +19,9 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -160,12 +162,17 @@ fun StarryPassTheme(
     }
 
     val context = LocalContext.current
-    val targetColorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val configuration = LocalConfiguration.current
+    // The animated copy below recomposes this scope on every transition frame; resolving the
+    // dynamic palette performs dozens of resource lookups, so only redo it when inputs change.
+    val targetColorScheme = remember(context, configuration, dynamicColor, useDark) {
+        when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (useDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            useDark -> StarryDarkColorScheme
+            else -> StarryLightColorScheme
         }
-        useDark -> StarryDarkColorScheme
-        else -> StarryLightColorScheme
     }
     val animatedColorScheme = targetColorScheme.animated()
 
