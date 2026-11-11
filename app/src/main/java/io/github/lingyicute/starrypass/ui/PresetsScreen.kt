@@ -54,7 +54,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,12 +93,6 @@ fun PresetsScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var editingPreset by remember { mutableStateOf<SitePreset?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(presets.isEmpty()) {
-        if (presets.isEmpty() && searchQuery.isNotEmpty()) {
-            searchQuery = ""
-        }
-    }
 
     val filtered = remember(presets, searchQuery) {
         val q = Spv2Spec.ecmaTrim(searchQuery).lowercase(Locale.ROOT)
@@ -158,7 +151,7 @@ fun PresetsScreen(
                 }
             }
 
-            if (presets.isNotEmpty()) {
+            if (presets.isNotEmpty() || searchQuery.isNotEmpty()) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },

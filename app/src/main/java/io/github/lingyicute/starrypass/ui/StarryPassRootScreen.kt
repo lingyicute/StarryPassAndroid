@@ -57,7 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -85,7 +85,6 @@ fun StarryPassRootScreen(
     val settings by viewModel.settingsState.collectAsState()
     val presets by viewModel.presetsState.collectAsState()
     val biometricEnrolled by viewModel.biometricEnrolledState.collectAsState()
-    val clipboardCountdown by viewModel.clipboardCountdownState.collectAsState()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -124,27 +123,25 @@ fun StarryPassRootScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(colorScheme.background)
-            .drawBehind {
-                val r1 = size.maxDimension * 0.45f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(blobPrimary, Color.Transparent),
-                        center = Offset(size.width * 0.92f, size.height * 0.06f),
-                        radius = r1
-                    ),
-                    radius = r1,
-                    center = Offset(size.width * 0.92f, size.height * 0.06f)
+            .drawWithCache {
+                val primaryCenter = Offset(size.width * 0.92f, size.height * 0.06f)
+                val primaryRadius = size.maxDimension * 0.45f
+                val primaryBrush = Brush.radialGradient(
+                    colors = listOf(blobPrimary, Color.Transparent),
+                    center = primaryCenter,
+                    radius = primaryRadius
                 )
-                val r2 = size.maxDimension * 0.38f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(blobTertiary, Color.Transparent),
-                        center = Offset(size.width * 0.08f, size.height * 0.92f),
-                        radius = r2
-                    ),
-                    radius = r2,
-                    center = Offset(size.width * 0.08f, size.height * 0.92f)
+                val tertiaryCenter = Offset(size.width * 0.08f, size.height * 0.92f)
+                val tertiaryRadius = size.maxDimension * 0.38f
+                val tertiaryBrush = Brush.radialGradient(
+                    colors = listOf(blobTertiary, Color.Transparent),
+                    center = tertiaryCenter,
+                    radius = tertiaryRadius
                 )
+                onDrawBehind {
+                    drawCircle(brush = primaryBrush, radius = primaryRadius, center = primaryCenter)
+                    drawCircle(brush = tertiaryBrush, radius = tertiaryRadius, center = tertiaryCenter)
+                }
             }
     ) {
         Scaffold(
@@ -258,7 +255,7 @@ fun StarryPassRootScreen(
                     presets = presets,
                     biometricEnrolled = biometricEnrolled,
                     colorizePassword = settings.colorizePassword,
-                    clipboardCountdown = clipboardCountdown,
+                    clipboardCountdown = viewModel.clipboardCountdownState,
                     onMasterChange = viewModel::onMasterChanged,
                     onCodeChange = viewModel::onCodeChanged,
                     onClearCode = viewModel::clearCode,

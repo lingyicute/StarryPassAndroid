@@ -96,6 +96,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
 import io.github.lingyicute.starrypass.crypto.Spv2Mode
@@ -104,6 +105,7 @@ import io.github.lingyicute.starrypass.crypto.Spv2Tier
 import io.github.lingyicute.starrypass.data.SitePreset
 import io.github.lingyicute.starrypass.ui.theme.PasswordMonoTextStyle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -113,7 +115,7 @@ fun GeneratorScreen(
     presets: List<SitePreset>,
     biometricEnrolled: Boolean,
     colorizePassword: Boolean,
-    clipboardCountdown: Int,
+    clipboardCountdown: StateFlow<Int>,
     onMasterChange: (String) -> Unit,
     onCodeChange: (String) -> Unit,
     onClearCode: () -> Unit,
@@ -168,50 +170,8 @@ fun GeneratorScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Sensitive clipboard live countdown banner
-            AnimatedVisibility(
-                visible = clipboardCountdown > 0,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = colorScheme.secondaryContainer,
-                    contentColor = colorScheme.onSecondaryContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Shield,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.clipboard_countdown_banner, clipboardCountdown),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        TextButton(
-                            onClick = onClearClipboardNow,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                        ) {
-                            Text(stringResource(R.string.clipboard_clear_now))
-                        }
-                    }
-                }
-            }
+            // Only this banner observes the once-per-second countdown.
+            ClipboardCountdownBanner(clipboardCountdown, onClearClipboardNow)
 
             // Main Generator Card (M3 Surface Container Low + Extra Large 28dp corners)
             Surface(
@@ -865,6 +825,58 @@ fun GeneratorScreen(
             }
 
             Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun ClipboardCountdownBanner(
+    countdown: StateFlow<Int>,
+    onClearClipboardNow: () -> Unit
+) {
+    val seconds by countdown.collectAsStateWithLifecycle()
+    val colorScheme = MaterialTheme.colorScheme
+    AnimatedVisibility(
+        visible = seconds > 0,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = colorScheme.secondaryContainer,
+            contentColor = colorScheme.onSecondaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.clipboard_countdown_banner, seconds),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                TextButton(
+                    onClick = onClearClipboardNow,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                ) {
+                    Text(stringResource(R.string.clipboard_clear_now))
+                }
+            }
         }
     }
 }
