@@ -43,6 +43,9 @@ internal data class ParsedAutofillStructure(
 
 internal object AssistStructureParser {
 
+    // Compiled once: the parser visits every node of a possibly large view tree.
+    private val WHITESPACE_RUN = Regex("\\s+")
+
     private val PASSWORD_KEYWORDS = listOf(
         "password",
         "passwd",
@@ -273,7 +276,7 @@ internal object AssistStructureParser {
                 }
                 if (attrName == "autocomplete") {
                     if (attrVal.contains("password")) return true
-                    val tokens = attrVal.split(Regex("\\s+")).filter { it.isNotEmpty() }
+                    val tokens = attrVal.split(WHITESPACE_RUN).filter { it.isNotEmpty() }
                     if (tokens.any { it in NON_PASSWORD_AUTOCOMPLETE_TOKENS }) {
                         explicitNonPasswordHtml = true
                     }
