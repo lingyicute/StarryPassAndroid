@@ -9,9 +9,9 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lingyicute.starrypass.ui.MainViewModel
 import io.github.lingyicute.starrypass.ui.StarryPassRootScreen
 import io.github.lingyicute.starrypass.ui.theme.StarryPassTheme
@@ -25,7 +25,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val settings by viewModel.settingsState.collectAsState()
+            val settings by viewModel.settingsState.collectAsStateWithLifecycle()
             StarryPassTheme(
                 themePreference = settings.theme,
                 dynamicColor = settings.dynamicColor

@@ -84,6 +84,8 @@ import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.BiometricHardwareStatus
 import io.github.lingyicute.starrypass.security.SessionWipeSignal
 
+private val CLIPBOARD_CLEAR_OPTIONS = listOf(0, 30, 45, 60, 120)
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SecuritySettingsScreen(
@@ -307,12 +309,11 @@ fun SecuritySettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = colorScheme.onSurface
                     )
-                    val options = listOf(0, 30, 45, 60, 120)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        options.forEach { sec ->
+                        CLIPBOARD_CLEAR_OPTIONS.forEach { sec ->
                             FilterChip(
                                 selected = settings.clipboardAutoClearSeconds == sec,
                                 onClick = { onClipboardClearSecondsChange(sec) },

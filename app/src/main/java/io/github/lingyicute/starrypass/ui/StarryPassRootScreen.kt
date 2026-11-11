@@ -46,7 +46,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +67,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.data.PresetRotationResult
@@ -81,10 +81,10 @@ fun StarryPassRootScreen(
     activity: FragmentActivity,
     viewModel: MainViewModel
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val settings by viewModel.settingsState.collectAsState()
-    val presets by viewModel.presetsState.collectAsState()
-    val biometricEnrolled by viewModel.biometricEnrolledState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+    val presets by viewModel.presetsState.collectAsStateWithLifecycle()
+    val biometricEnrolled by viewModel.biometricEnrolledState.collectAsStateWithLifecycle()
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }

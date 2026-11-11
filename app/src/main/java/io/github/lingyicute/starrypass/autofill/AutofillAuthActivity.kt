@@ -86,6 +86,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,6 +128,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+private val AUTOFILL_PIN_QUICK_LENGTHS = listOf(4, 6, 8, 12)
+private val AUTOFILL_DEFAULT_QUICK_LENGTHS = listOf(12, 16, 20, 24, 32)
 
 class AutofillAuthActivity : FragmentActivity() {
 
@@ -428,28 +432,30 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 mode == preset.mode &&
                                                 counter == preset.counter &&
                                                 tier == preset.tier
-                                            FilterChip(
-                                                selected = selected,
-                                                onClick = {
-                                                    cancelInFlightDerive()
-                                                    val clampedCounter = Spv2Spec.clampCounter(preset.counter)
-                                                    code = preset.code
-                                                    length = Spv2Spec.clampLength(preset.length)
-                                                    mode = preset.mode
-                                                    counter = clampedCounter
-                                                    counterText = clampedCounter.toString()
-                                                    tier = preset.tier
-                                                },
-                                                label = {
-                                                    Text(
-                                                        if (preset.counter > 1) {
-                                                            "${preset.displayName} #${preset.counter}"
-                                                        } else {
-                                                            preset.displayName
-                                                        }
-                                                    )
-                                                }
-                                            )
+                                            key(preset.id) {
+                                                FilterChip(
+                                                    selected = selected,
+                                                    onClick = {
+                                                        cancelInFlightDerive()
+                                                        val clampedCounter = Spv2Spec.clampCounter(preset.counter)
+                                                        code = preset.code
+                                                        length = Spv2Spec.clampLength(preset.length)
+                                                        mode = preset.mode
+                                                        counter = clampedCounter
+                                                        counterText = clampedCounter.toString()
+                                                        tier = preset.tier
+                                                    },
+                                                    label = {
+                                                        Text(
+                                                            if (preset.counter > 1) {
+                                                                "${preset.displayName} #${preset.counter}"
+                                                            } else {
+                                                                preset.displayName
+                                                            }
+                                                        )
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -646,9 +652,9 @@ class AutofillAuthActivity : FragmentActivity() {
                                                 )
                                                 Spacer(Modifier.height(4.dp))
                                                 val quickLengths = if (mode == Spv2Mode.PIN) {
-                                                    listOf(4, 6, 8, 12)
+                                                    AUTOFILL_PIN_QUICK_LENGTHS
                                                 } else {
-                                                    listOf(12, 16, 20, 24, 32)
+                                                    AUTOFILL_DEFAULT_QUICK_LENGTHS
                                                 }
                                                 FlowRow(
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),

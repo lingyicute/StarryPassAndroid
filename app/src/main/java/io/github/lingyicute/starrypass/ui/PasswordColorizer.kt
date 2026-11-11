@@ -7,6 +7,7 @@ package io.github.lingyicute.starrypass.ui
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -36,16 +37,30 @@ fun buildColorizedPassword(
         }
         return@buildAnnotatedString
     }
+    // Coalesce consecutive same-colour runs into one span instead of one span per char.
+    var runColor: Color? = null
+    val run = StringBuilder()
+    fun flushRun() {
+        if (run.isNotEmpty()) {
+            withStyle(SpanStyle(color = runColor!!)) {
+                append(run.toString())
+            }
+            run.clear()
+        }
+    }
     for (ch in password) {
         val color = when {
             ch in '0'..'9' -> colorScheme.primary
             ch in 'a'..'z' || ch in 'A'..'Z' -> colorScheme.onSurface
             else -> colorScheme.tertiary
         }
-        withStyle(SpanStyle(color = color)) {
-            append(ch)
+        if (color != runColor) {
+            flushRun()
+            runColor = color
         }
+        run.append(ch)
     }
+    flushRun()
 }
 
 @Composable
