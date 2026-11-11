@@ -98,6 +98,7 @@
     <string name="presets_empty_title">暂无保存的站点预设</string>
     <string name="presets_empty_desc" formatted="false">你可以保持 100% 纯无状态使用，也可以在此保存常用代号、长度、字符集与轮换序号，方便一键套用及系统自动填充匹配。</string>
     <string name="presets_search_hint">搜索代号、别名或域名…</string>
+    <string name="presets_no_results">没有匹配的站点预设</string>
     <string name="preset_dialog_add_title">保存站点策略预设</string>
     <string name="preset_dialog_edit_title">编辑站点策略预设</string>
     <string name="preset_field_alias">显示别名（选填，如 GitHub 主号）</string>

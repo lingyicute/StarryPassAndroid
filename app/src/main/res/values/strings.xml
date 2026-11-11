@@ -98,6 +98,7 @@
     <string name="presets_empty_title">No Saved Site Presets</string>
     <string name="presets_empty_desc" formatted="false">Stay 100% stateless, or optionally save site codes, lengths, modes, and rotation counters here for one-tap reuse &amp; Autofill matching.</string>
     <string name="presets_search_hint">Filter by site code, alias, or domain…</string>
+    <string name="presets_no_results">No presets match your search</string>
     <string name="preset_dialog_add_title">Save Site Preset</string>
     <string name="preset_dialog_edit_title">Edit Site Preset</string>
     <string name="preset_field_alias">Display Alias (optional)</string>
