@@ -331,6 +331,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             "ltd", "plc", "sch"
         )
 
+        // Package segments that never identify the site (allocated once, not per segment).
+        private val PACKAGE_NOISE_SEGMENTS = setOf(
+            "com", "org", "net", "io", "app", "me", "co", "cn", "hk", "tw",
+            "android", "mobile", "client", "release", "debug"
+        )
+
         private val IPV4_ADDRESS = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")
         private val WRAPPER_SCHEME_PREFIX = Regex("^(?:blob|view-source):")
         private val SCHEME_PREFIX = Regex("^[a-z][a-z0-9+.-]*://")
@@ -484,12 +490,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 val rawParts = Spv2Spec.ecmaTrim(packageName).lowercase(Locale.ROOT).split('.').filter { it.isNotEmpty() }
                 val meaningful = rawParts
                     .drop(if (rawParts.size >= 2) 1 else 0) // drop leading TLD (com, org, ch, de, io, jp, ...)
-                    .filterNot {
-                        it in setOf(
-                            "com", "org", "net", "io", "app", "me", "co", "cn", "hk", "tw",
-                            "android", "mobile", "client", "release", "debug"
-                        )
-                    }
+                    .filterNot { it in PACKAGE_NOISE_SEGMENTS }
                 if (meaningful.isNotEmpty()) return meaningful.first()
             }
             return ""
