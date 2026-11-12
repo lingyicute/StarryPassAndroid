@@ -28,7 +28,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +46,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -85,7 +86,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -419,43 +419,41 @@ class AutofillAuthActivity : FragmentActivity() {
                                         style = MaterialTheme.typography.labelMedium,
                                         color = colorScheme.onSurfaceVariant
                                     )
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .horizontalScroll(rememberScrollState()),
+                                    val activeCode = Spv2Spec.ecmaTrim(code)
+                                    // Lazy: users can keep many presets, only the visible chips are composed.
+                                    // Ids are unique: PreferencesRepository.decodePresets drops duplicates.
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        val activeCode = Spv2Spec.ecmaTrim(code)
-                                        presets.forEach { preset ->
+                                        items(presets, key = { it.id }) { preset ->
                                             val selected = activeCode == preset.code &&
                                                 length == preset.length &&
                                                 mode == preset.mode &&
                                                 counter == preset.counter &&
                                                 tier == preset.tier
-                                            key(preset.id) {
-                                                FilterChip(
-                                                    selected = selected,
-                                                    onClick = {
-                                                        cancelInFlightDerive()
-                                                        val clampedCounter = Spv2Spec.clampCounter(preset.counter)
-                                                        code = preset.code
-                                                        length = Spv2Spec.clampLength(preset.length)
-                                                        mode = preset.mode
-                                                        counter = clampedCounter
-                                                        counterText = clampedCounter.toString()
-                                                        tier = preset.tier
-                                                    },
-                                                    label = {
-                                                        Text(
-                                                            if (preset.counter > 1) {
-                                                                "${preset.displayName} #${preset.counter}"
-                                                            } else {
-                                                                preset.displayName
-                                                            }
-                                                        )
-                                                    }
-                                                )
-                                            }
+                                            FilterChip(
+                                                selected = selected,
+                                                onClick = {
+                                                    cancelInFlightDerive()
+                                                    val clampedCounter = Spv2Spec.clampCounter(preset.counter)
+                                                    code = preset.code
+                                                    length = Spv2Spec.clampLength(preset.length)
+                                                    mode = preset.mode
+                                                    counter = clampedCounter
+                                                    counterText = clampedCounter.toString()
+                                                    tier = preset.tier
+                                                },
+                                                label = {
+                                                    Text(
+                                                        if (preset.counter > 1) {
+                                                            "${preset.displayName} #${preset.counter}"
+                                                        } else {
+                                                            preset.displayName
+                                                        }
+                                                    )
+                                                }
+                                            )
                                         }
                                     }
                                 }
