@@ -84,7 +84,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -109,6 +108,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.lingyicute.starrypass.R
 import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.crypto.DeriveRequest
@@ -199,9 +199,9 @@ class AutofillAuthActivity : FragmentActivity() {
         val app = application as StarryPassApp
 
         setContent {
-            val settings by app.preferencesRepository.settingsFlow.collectAsState(initial = AppSettings())
-            val presets by app.preferencesRepository.presetsFlow.collectAsState(initial = emptyList())
-            val bioEnrolled by app.biometricVault.isEnrolled.collectAsState()
+            val settings by app.preferencesRepository.settingsFlow.collectAsStateWithLifecycle(initialValue = AppSettings())
+            val presets by app.preferencesRepository.presetsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+            val bioEnrolled by app.biometricVault.isEnrolled.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
             val focusManager = LocalFocusManager.current
 
