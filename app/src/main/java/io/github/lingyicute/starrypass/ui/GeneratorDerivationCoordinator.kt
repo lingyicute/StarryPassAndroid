@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import java.text.Normalizer
 
 /** Called on the UI thread; every result is tied to the input snapshot that produced it. */
 internal class GeneratorDerivationCoordinator(
@@ -42,9 +43,15 @@ internal class GeneratorDerivationCoordinator(
         sequence++
     }
 
+    private fun canonicalMaster(master: String): String =
+        Normalizer.normalize(master, Normalizer.Form.NFC)
+
+    private fun canonicalCode(code: String): String =
+        Normalizer.normalize(Spv2Spec.ecmaTrim(code), Normalizer.Form.NFC)
+
     private fun sameDeriveInputs(a: GeneratorUiState, b: GeneratorUiState): Boolean =
-        a.master == b.master &&
-            a.code == b.code &&
+        canonicalMaster(a.master) == canonicalMaster(b.master) &&
+            canonicalCode(a.code) == canonicalCode(b.code) &&
             a.length == b.length &&
             a.mode == b.mode &&
             a.counter == b.counter &&
@@ -54,8 +61,8 @@ internal class GeneratorDerivationCoordinator(
         s.mode == Spv2Mode.PIN && Spv2Spec.clampLength(s.length) <= 8
 
     private fun sameStrengthInputs(a: GeneratorUiState, b: GeneratorUiState): Boolean =
-        a.master == b.master &&
-            a.code == b.code &&
+        canonicalMaster(a.master) == canonicalMaster(b.master) &&
+            canonicalCode(a.code) == canonicalCode(b.code) &&
             a.tier == b.tier &&
             a.mode == b.mode &&
             isShortPin(a) == isShortPin(b)
@@ -69,19 +76,21 @@ internal class GeneratorDerivationCoordinator(
                 (current.isDeriving && job?.isActive == true && debounceMs >= activeDebounceMs) ||
                 (!ready && !current.isDeriving && current.errorCode == null)
             if (canKeepState) {
-                state.update { prev ->
-                    if (sameDeriveInputs(prev, candidate)) {
-                        candidate.copy(
-                            derivedPassword = prev.derivedPassword,
-                            isDeriving = prev.isDeriving,
-                            lastCached = prev.lastCached,
-                            lastElapsedMs = prev.lastElapsedMs,
-                            errorCode = prev.errorCode,
-                            strength = prev.strength,
-                            katVerified = prev.katVerified
-                        )
-                    } else {
-                        prev
+                if (current != candidate) {
+                    state.update { prev ->
+                        if (sameDeriveInputs(prev, candidate)) {
+                            candidate.copy(
+                                derivedPassword = prev.derivedPassword,
+                                isDeriving = prev.isDeriving,
+                                lastCached = prev.lastCached,
+                                lastElapsedMs = prev.lastElapsedMs,
+                                errorCode = prev.errorCode,
+                                strength = prev.strength,
+                                katVerified = prev.katVerified
+                            )
+                        } else {
+                            prev
+                        }
                     }
                 }
                 return
