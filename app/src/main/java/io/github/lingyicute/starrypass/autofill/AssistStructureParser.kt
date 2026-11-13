@@ -17,34 +17,24 @@ import java.util.Locale
 internal data class ParsedAutofillStructure(
     val passwordIds: List<AutofillId>,
     val focusedEditableId: AutofillId?,
-    val allEditableIds: List<AutofillId>,
     val webDomain: String?,
     val packageName: String?
 ) {
     /**
      * Resolves which fields should be targeted for filling:
      * 1. Explicit password fields when present (unless manual autofill was invoked on another focused editable input).
-     * 2. Focused editable field (or all editable text fields) when manually requested via context menu.
+     * 2. Only the focused editable field when manually requested outside a password field.
+     * A missing focus must not turn a password into the value of every text input on the page.
      */
-    fun resolveTargetIds(isManualRequest: Boolean): List<AutofillId> {
-        if (isManualRequest && focusedEditableId != null && focusedEditableId !in passwordIds) {
-            return listOf(focusedEditableId)
-        }
-        if (passwordIds.isNotEmpty()) {
-            return passwordIds.distinct()
-        }
-        if (isManualRequest) {
-            if (focusedEditableId != null) return listOf(focusedEditableId)
-            if (allEditableIds.isNotEmpty()) return allEditableIds.distinct()
-        }
-        return emptyList()
-    }
+    fun resolveTargetIds(isManualRequest: Boolean): List<AutofillId> =
+        AssistStructureParser.selectTargetIds(passwordIds, focusedEditableId, isManualRequest)
 }
 
 internal object AssistStructureParser {
 
     // Compiled once: the parser visits every node of a possibly large view tree.
     private val WHITESPACE_RUN = Regex("\\s+")
+    private val WEB_SCHEMES = setOf("http", "https")
 
     private val PASSWORD_KEYWORDS = listOf(
         "password",
@@ -141,8 +131,7 @@ internal object AssistStructureParser {
         val webDomain = focusedPasswordDomain ?: focusedDomain ?: passwordDomain ?: detectedDomain
         return ParsedAutofillStructure(
             passwordIds = idsWithinDomain(passwordFields, webDomain),
-            focusedEditableId = focusedEditableId,
-            allEditableIds = idsWithinDomain(editableFields, webDomain),
+            focusedEditableId = focusedEditableId?.takeIf { it in idsWithinDomain(editableFields, webDomain) },
             webDomain = webDomain,
             packageName = pkgName
         )
@@ -157,9 +146,26 @@ internal object AssistStructureParser {
             .map { it.first }
             .distinct()
 
+    internal fun <T> selectTargetIds(
+        passwordIds: List<T>,
+        focusedEditableId: T?,
+        isManualRequest: Boolean
+    ): List<T> {
+        if (isManualRequest && focusedEditableId != null && focusedEditableId !in passwordIds) {
+            return listOf(focusedEditableId)
+        }
+        // Without a focused editable field, only explicitly identified password fields are safe.
+        return passwordIds.distinct()
+    }
+
     internal fun resolveNodeDomain(rawDomain: String?, rawScheme: String?): String? {
         val cleanDomain = rawDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() } ?: return null
         val cleanScheme = rawScheme?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
+        // webScheme is authoritative even when webDomain happens to contain its own URL scheme.
+        if (cleanScheme != null && cleanScheme !in WEB_SCHEMES) return null
+        if (cleanScheme != null && cleanDomain.contains("://") &&
+            !cleanDomain.startsWith("$cleanScheme://", ignoreCase = true)
+        ) return null
         val candidate = if (
             cleanScheme != null &&
             !cleanDomain.contains("://") &&
