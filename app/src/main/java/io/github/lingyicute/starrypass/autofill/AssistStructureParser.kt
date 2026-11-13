@@ -105,8 +105,8 @@ internal object AssistStructureParser {
     )
 
     fun parse(structure: AssistStructure): ParsedAutofillStructure {
-        val passwordIds = mutableListOf<AutofillId>()
-        val allEditableIds = mutableListOf<AutofillId>()
+        val passwordFields = mutableListOf<Pair<AutofillId, String?>>()
+        val editableFields = mutableListOf<Pair<AutofillId, String?>>()
         var focusedEditableId: AutofillId? = null
         var detectedDomain: String? = null
         val pkgName = structure.activityComponent?.packageName
@@ -133,19 +133,29 @@ internal object AssistStructureParser {
                         if (isFocused && focusedPasswordDomain == null) focusedPasswordDomain = dom
                     }
                 },
-                passwordIds = passwordIds,
-                allEditableIds = allEditableIds
+                passwordFields = passwordFields,
+                editableFields = editableFields
             )
         }
 
+        val webDomain = focusedPasswordDomain ?: focusedDomain ?: passwordDomain ?: detectedDomain
         return ParsedAutofillStructure(
-            passwordIds = passwordIds.distinct(),
+            passwordIds = idsWithinDomain(passwordFields, webDomain),
             focusedEditableId = focusedEditableId,
-            allEditableIds = allEditableIds.distinct(),
-            webDomain = focusedPasswordDomain ?: focusedDomain ?: passwordDomain ?: detectedDomain,
+            allEditableIds = idsWithinDomain(editableFields, webDomain),
+            webDomain = webDomain,
             packageName = pkgName
         )
     }
+
+    /**
+     * A page can embed frames from other sites. A field that explicitly belongs to another
+     * domain than the one the password is derived for must never receive that password.
+     */
+    internal fun <T> idsWithinDomain(fields: List<Pair<T, String?>>, webDomain: String?): List<T> =
+        fields.filter { (_, domain) -> domain == null || domain == webDomain }
+            .map { it.first }
+            .distinct()
 
     internal fun resolveNodeDomain(rawDomain: String?, rawScheme: String?): String? {
         val cleanDomain = rawDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() } ?: return null
@@ -169,8 +179,8 @@ internal object AssistStructureParser {
         onDomain: (String) -> Unit,
         onFocusedEditable: (AutofillId, String?) -> Unit,
         onPasswordDomain: (String?, Boolean) -> Unit,
-        passwordIds: MutableList<AutofillId>,
-        allEditableIds: MutableList<AutofillId>
+        passwordFields: MutableList<Pair<AutofillId, String?>>,
+        editableFields: MutableList<Pair<AutofillId, String?>>
     ) {
         val rawScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) node.webScheme else null
         val dom = resolveNodeDomain(node.webDomain, rawScheme)
@@ -181,12 +191,12 @@ internal object AssistStructureParser {
 
         val autofillId = node.autofillId
         if (autofillId != null && isFillableTextInput(node)) {
-            allEditableIds.add(autofillId)
+            editableFields.add(autofillId to activeDomain)
             if (node.isFocused) {
                 onFocusedEditable(autofillId, activeDomain)
             }
             if (isPasswordNode(node)) {
-                passwordIds.add(autofillId)
+                passwordFields.add(autofillId to activeDomain)
                 onPasswordDomain(activeDomain, node.isFocused)
             }
         }
@@ -198,8 +208,8 @@ internal object AssistStructureParser {
                 onDomain = onDomain,
                 onFocusedEditable = onFocusedEditable,
                 onPasswordDomain = onPasswordDomain,
-                passwordIds = passwordIds,
-                allEditableIds = allEditableIds
+                passwordFields = passwordFields,
+                editableFields = editableFields
             )
         }
     }

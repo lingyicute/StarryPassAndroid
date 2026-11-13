@@ -140,6 +140,21 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `autofill targets exclude fields that belong to another web domain`() {
+        val fields = listOf(
+            "password" to "login.example.com",
+            "framed" to "ads.tracker.test",
+            "native" to null,
+            "password" to "login.example.com"
+        )
+        assertEquals(
+            listOf("password", "native"),
+            AssistStructureParser.idsWithinDomain(fields, "login.example.com")
+        )
+        assertEquals(listOf("framed", "native"), AssistStructureParser.idsWithinDomain(fields, "ads.tracker.test"))
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")
