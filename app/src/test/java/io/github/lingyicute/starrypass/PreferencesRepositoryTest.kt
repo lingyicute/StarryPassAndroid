@@ -190,7 +190,7 @@ class PreferencesRepositoryTest {
     }
 
     @Test
-    fun `autofill matching prioritises explicit package and exact domain code over stem code`() = runBlocking {
+    fun `autofill matching uses web domain instead of host app package when both are present`() = runBlocking {
         val repo = repository()
         val exactDomainCode = SitePreset(id = "exact", code = "gist.github.com")
         val stemCode = SitePreset(id = "stem", code = "github", counter = 3)
@@ -200,8 +200,21 @@ class PreferencesRepositoryTest {
         repo.upsertPreset(pkgBound)
 
         assertEquals("exact", repo.findMatchingPreset("https://gist.github.com/login", null)?.id)
-        assertEquals("pkg", repo.findMatchingPreset("https://github.com/login", "com.example.corp")?.id)
+        assertEquals("stem", repo.findMatchingPreset("https://github.com/login", "com.example.corp")?.id)
+        assertEquals(null, repo.findMatchingPreset("https://unrelated.example/login", "com.example.corp")?.id)
+        assertEquals("pkg", repo.findMatchingPreset(null, "com.example.corp")?.id)
         assertEquals("stem", repo.findMatchingPreset(null, "com.github.android")?.id)
+    }
+
+    @Test
+    fun `browser package binding cannot follow the browser onto another website`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "browser", code = "chrome", autofillPackage = "com.android.chrome"))
+        repo.upsertPreset(SitePreset(id = "site", code = "shop", autofillDomain = "shop.example.com"))
+
+        assertEquals("site", repo.findMatchingPreset("https://shop.example.com/login", "com.android.chrome")?.id)
+        assertEquals(null, repo.findMatchingPreset("https://other.example.com/login", "com.android.chrome")?.id)
+        assertEquals("browser", repo.findMatchingPreset(null, "com.android.chrome")?.id)
     }
 
     @Test
