@@ -67,7 +67,7 @@ internal class GeneratorDerivationCoordinator(
             val ready = candidate.master.isNotEmpty() && Spv2Spec.ecmaTrim(candidate.code).isNotEmpty()
             val canKeepState = current.derivedPassword != null ||
                 (current.isDeriving && job?.isActive == true && debounceMs >= activeDebounceMs) ||
-                (!ready && !current.isDeriving && current.derivedPassword == null && current.errorCode == null)
+                (!ready && !current.isDeriving && current.errorCode == null)
             if (canKeepState) {
                 state.update { prev ->
                     if (sameDeriveInputs(prev, candidate)) {
