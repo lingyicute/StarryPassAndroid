@@ -14,7 +14,6 @@
     <string name="gen_card_title">Derive Password</string>
     <string name="gen_card_subtitle">Same master password, code &amp; policy always derive the identical password</string>
     <string name="action_reset">Reset</string>
-    <string name="action_clear">Clear</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_save">Save</string>
     <string name="action_delete">Delete</string>
