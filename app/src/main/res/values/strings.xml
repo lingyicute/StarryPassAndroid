@@ -142,6 +142,7 @@
     <string name="biometric_err_empty_master">Please enter a master password first</string>
     <string name="biometric_err_cipher">Hardware keystore cryptographic operation failed</string>
     <string name="biometric_err_persist">Could not save the biometric vault; nothing was stored</string>
+    <string name="biometric_err_revoke">Could not clear the biometric vault; please try again</string>
     <string name="biometric_err_not_enrolled">Biometric vault is not enrolled</string>
     <string name="biometric_err_key_invalidated">System biometrics changed and the key is invalid. Revoke the stored vault before re-enrolling.</string>
     <string name="biometric_err_hardware_unverified">A hardware-backed Keystore key could not be verified. The existing vault, if any, is kept; you can revoke it in settings.</string>
