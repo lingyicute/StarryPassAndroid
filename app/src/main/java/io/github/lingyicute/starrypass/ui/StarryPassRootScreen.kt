@@ -73,6 +73,7 @@ import io.github.lingyicute.starrypass.StarryPassApp
 import io.github.lingyicute.starrypass.data.PresetRotationResult
 import io.github.lingyicute.starrypass.data.ThemePreference
 import io.github.lingyicute.starrypass.security.ScreenSecurityEffect
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -89,6 +90,13 @@ fun StarryPassRootScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // A new message replaces the one on screen. Queued snackbars would otherwise keep
+    // appearing for several seconds each after repeated actions such as copying.
+    val snackbarJob = remember { mutableStateOf<Job?>(null) }
+    val showMessage: (String) -> Unit = { message ->
+        snackbarJob.value?.cancel()
+        snackbarJob.value = scope.launch { snackbarHostState.showSnackbar(message) }
+    }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Re-queried on resume: users may enroll a fingerprint in system settings and come back.
     var biometricHardwareStatus by remember { mutableStateOf(viewModel.queryBiometricHardware()) }
@@ -264,7 +272,7 @@ fun StarryPassRootScreen(
                         viewModel.biometricVault.unlockMasterPassword(
                             activity = activity,
                             onSuccess = { unlocked -> viewModel.onMasterChanged(unlocked) },
-                            onError = { err -> scope.launch { snackbarHostState.showSnackbar(err) } }
+                            onError = { err -> showMessage(err) }
                         )
                     },
                     onPolicyExpandedChange = viewModel::setPolicyExpanded,
@@ -276,19 +284,17 @@ fun StarryPassRootScreen(
                     onApplyPreset = viewModel::applyPreset,
                     onSaveCurrentAsPreset = {
                         viewModel.saveCurrentAsPreset {
-                            scope.launch { snackbarHostState.showSnackbar(presetSavedMsg) }
+                            showMessage(presetSavedMsg)
                         }
                     },
                     onCopyClick = {
                         val ok = viewModel.copyCurrentPassword(appName)
-                        scope.launch {
-                            snackbarHostState.showSnackbar(if (ok) copiedMsg else copyFailedMsg)
-                        }
+                        showMessage(if (ok) copiedMsg else copyFailedMsg)
                         ok
                     },
                     onClearClipboardNow = {
                         viewModel.clearClipboardNow()
-                        scope.launch { snackbarHostState.showSnackbar(clipboardClearedMsg) }
+                        showMessage(clipboardClearedMsg)
                     },
                     modifier = Modifier.padding(innerPadding)
                 )
@@ -309,7 +315,7 @@ fun StarryPassRootScreen(
                                 PresetRotationResult.LimitReached -> activity.getString(R.string.preset_rotation_limit_message)
                                 PresetRotationResult.NotFound -> activity.getString(R.string.preset_rotation_missing)
                             }
-                            scope.launch { snackbarHostState.showSnackbar(message) }
+                            showMessage(message)
                         }
                     },
                     onDeletePreset = viewModel::deletePreset,
@@ -334,16 +340,16 @@ fun StarryPassRootScreen(
                             activity = activity,
                             masterPassword = secret,
                             onSuccess = {
-                                scope.launch { snackbarHostState.showSnackbar(bioEnrolledMsg) }
+                                showMessage(bioEnrolledMsg)
                             },
                             onError = { err ->
-                                scope.launch { snackbarHostState.showSnackbar(err) }
+                                showMessage(err)
                             }
                         )
                     },
                     onRevokeBiometric = {
                         viewModel.biometricVault.clearVault()
-                        scope.launch { snackbarHostState.showSnackbar(bioRevokedMsg) }
+                        showMessage(bioRevokedMsg)
                     },
                     onRefreshBiometric = {
                         viewModel.biometricVault.refreshState()
