@@ -137,9 +137,10 @@ class AutofillAuthActivity : FragmentActivity() {
     companion object {
         const val EXTRA_PASSWORD_IDS = "extra_password_ids"
         const val EXTRA_MANUAL_REQUEST = "extra_manual_request"
+        const val EXTRA_EXPECTED_DOMAIN = "extra_expected_domain"
+        const val EXTRA_EXPECTED_PACKAGE = "extra_expected_package"
         const val EXTRA_SUGGESTED_CODE = "extra_suggested_code"
         const val EXTRA_TARGET_LABEL = "extra_target_label"
-        const val EXTRA_PRESET_ID = "extra_preset_id"
         const val EXTRA_PRESET_MODE = "extra_preset_mode"
         const val EXTRA_PRESET_LENGTH = "extra_preset_length"
         const val EXTRA_PRESET_COUNTER = "extra_preset_counter"
@@ -166,19 +167,31 @@ class AutofillAuthActivity : FragmentActivity() {
         }
 
         val isManualRequest = intent.getBooleanExtra(EXTRA_MANUAL_REQUEST, false)
+        val expectedDomain = intent.getStringExtra(EXTRA_EXPECTED_DOMAIN)
+        val expectedPackage = intent.getStringExtra(EXTRA_EXPECTED_PACKAGE)
         // Prefer fresh AutofillIds parsed from the live AssistStructure (critical for Chrome/WebView virtual nodes),
-        // falling back cleanly to EXTRA_PASSWORD_IDS passed from StarryPassAutofillService.
-        val targetIds: List<AutofillId> = liveStructure
-            ?.let {
-                // A malformed live structure must not crash the sheet; use the service's ids instead.
-                try {
-                    AssistStructureParser.parse(it).resolveTargetIds(isManualRequest)
-                } catch (_: RuntimeException) {
-                    null
-                }
+        // while aborting if the live origin/package changed since onFillRequest or no valid targets remain.
+        var liveParseFailed = false
+        val liveParsed = liveStructure?.let {
+            // A malformed live structure must not crash the sheet; use the service's ids instead.
+            try {
+                AssistStructureParser.parse(it)
+            } catch (_: RuntimeException) {
+                liveParseFailed = true
+                null
             }
-            ?.takeIf { it.isNotEmpty() }
-            ?: fallbackIds
+        }
+        val targetIds: List<AutofillId> = AssistStructureParser.resolveAuthenticatedTargets(
+            hasLiveStructure = liveStructure != null,
+            liveParseFailed = liveParseFailed,
+            liveTargets = liveParsed?.resolveTargetIds(isManualRequest).orEmpty(),
+            liveWebDomain = liveParsed?.webDomain,
+            livePackageName = liveParsed?.packageName,
+            expectedWebDomain = expectedDomain,
+            expectedPackageName = expectedPackage,
+            selfPackageName = packageName,
+            fallbackTargets = fallbackIds
+        )
 
         if (targetIds.isEmpty()) {
             cancelAutofill()

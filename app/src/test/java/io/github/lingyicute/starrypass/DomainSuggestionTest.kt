@@ -221,6 +221,70 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `autofill authentication rejects origin or package drift and empty live targets`() {
+        val selfPkg = "io.github.lingyicute.starrypass"
+        assertEquals(
+            listOf("live-pw"),
+            AssistStructureParser.resolveAuthenticatedTargets(
+                hasLiveStructure = true,
+                liveParseFailed = false,
+                liveTargets = listOf("live-pw"),
+                liveWebDomain = "github.com",
+                livePackageName = "com.android.chrome",
+                expectedWebDomain = "github.com",
+                expectedPackageName = "com.android.chrome",
+                selfPackageName = selfPkg,
+                fallbackTargets = listOf("old-pw")
+            )
+        )
+        // Cross-origin redirect between onFillRequest and authentication must abort.
+        assertEquals(
+            emptyList<String>(),
+            AssistStructureParser.resolveAuthenticatedTargets(
+                hasLiveStructure = true,
+                liveParseFailed = false,
+                liveTargets = listOf("evil-pw"),
+                liveWebDomain = "evil.example",
+                livePackageName = "com.android.chrome",
+                expectedWebDomain = "github.com",
+                expectedPackageName = "com.android.chrome",
+                selfPackageName = selfPkg,
+                fallbackTargets = listOf("old-pw")
+            )
+        )
+        // A valid live structure with zero eligible targets must not fall back to stale IDs.
+        assertEquals(
+            emptyList<String>(),
+            AssistStructureParser.resolveAuthenticatedTargets(
+                hasLiveStructure = true,
+                liveParseFailed = false,
+                liveTargets = emptyList(),
+                liveWebDomain = "github.com",
+                livePackageName = "com.android.chrome",
+                expectedWebDomain = "github.com",
+                expectedPackageName = "com.android.chrome",
+                selfPackageName = selfPkg,
+                fallbackTargets = listOf("old-pw")
+            )
+        )
+        // Missing live structure falls back to service-provided IDs unless targeting StarryPass itself.
+        assertEquals(
+            listOf("old-pw"),
+            AssistStructureParser.resolveAuthenticatedTargets(
+                hasLiveStructure = false,
+                liveParseFailed = false,
+                liveTargets = emptyList(),
+                liveWebDomain = null,
+                livePackageName = null,
+                expectedWebDomain = "github.com",
+                expectedPackageName = "com.android.chrome",
+                selfPackageName = selfPkg,
+                fallbackTargets = listOf("old-pw")
+            )
+        )
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")
