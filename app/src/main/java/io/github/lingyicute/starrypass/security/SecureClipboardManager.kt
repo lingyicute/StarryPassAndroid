@@ -11,6 +11,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PersistableBundle
+import android.os.SystemClock
 import io.github.lingyicute.starrypass.crypto.Spv2Primitives
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import kotlinx.coroutines.CoroutineScope
@@ -144,13 +145,19 @@ class SecureClipboardManager(context: Context) {
         // The countdown lives in this process: if the system reclaims the process while the app is
         // in the background, the clipboard is not cleared.
         clearJob = scope.launch {
-            var rem = seconds
-            _remainingSeconds.value = rem
-            while (rem > 0) {
-                delay(1_000L)
-                rem--
-                _remainingSeconds.value = rem
+            // Count against a deadline on a clock that keeps running in deep sleep. A plain
+            // one-second tick loop pauses while the device sleeps and would clear late.
+            val deadline = SystemClock.elapsedRealtime() + seconds * 1_000L
+            _remainingSeconds.value = seconds
+            while (true) {
+                val leftMs = deadline - SystemClock.elapsedRealtime()
+                if (leftMs <= 0L) break
+                // Wake on the next whole-second boundary of the remaining time.
+                delay((leftMs - 1L) % 1_000L + 1L)
+                val nowLeftMs = deadline - SystemClock.elapsedRealtime()
+                _remainingSeconds.value = ((nowLeftMs + 999L) / 1_000L).toInt().coerceIn(0, seconds)
             }
+            _remainingSeconds.value = 0
             // Clear unless the user is known to have replaced the clip with something else
             val expectedHash = lastCopiedSha256
             if (expectedHash != null && shouldWipeNow(expectedHash)) {
