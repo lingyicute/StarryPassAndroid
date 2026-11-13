@@ -146,6 +146,22 @@ class DomainSuggestionTest {
         assertNull(AssistStructureParser.resolveNodeDomain("com.android.providers.downloads", "content"))
         assertNull(AssistStructureParser.resolveNodeDomain("blank", "about"))
         assertNull(AssistStructureParser.resolveNodeDomain("void(0)", "javascript"))
+        // Do not let a URL embedded in webDomain override the authoritative webScheme.
+        assertNull(AssistStructureParser.resolveNodeDomain("https://example.com", "file"))
+        assertNull(AssistStructureParser.resolveNodeDomain("http://example.com", "content"))
+        assertNull(AssistStructureParser.resolveNodeDomain("ftp://example.com", "https"))
+        assertEquals("example.com", AssistStructureParser.resolveNodeDomain("HTTPS://example.com", "HTTPS"))
+    }
+
+    @Test
+    fun `manual autofill only targets the focused field or identified password fields`() {
+        // A missing focus is not permission to fill username, email and search fields with a password.
+        assertEquals(emptyList<String>(), AssistStructureParser.selectTargetIds(emptyList(), null, true))
+        assertEquals(listOf("password"), AssistStructureParser.selectTargetIds(listOf("password", "password"), null, true))
+        assertEquals(listOf("focused"), AssistStructureParser.selectTargetIds(listOf("password"), "focused", true))
+        assertEquals(listOf("focused"), AssistStructureParser.selectTargetIds(emptyList(), "focused", true))
+        assertEquals(emptyList<String>(), AssistStructureParser.selectTargetIds(emptyList(), "focused", false))
+        assertEquals(listOf("password"), AssistStructureParser.selectTargetIds(listOf("password"), "focused", false))
     }
 
     @Test
