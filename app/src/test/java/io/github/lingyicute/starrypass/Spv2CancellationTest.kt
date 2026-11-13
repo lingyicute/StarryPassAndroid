@@ -8,6 +8,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -15,6 +16,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -193,6 +195,23 @@ class Spv2CancellationTest {
             pending.cancelAndJoin()
 
             assertTrue(engine.derive(committed.copy(length = 20)).cached)
+        }
+    }
+
+    @Test
+    fun `a wipe queued behind Argon2 still runs after its caller is cancelled`() = runBlocking {
+        workerDispatcher().use { dispatcher ->
+            val engine = Spv2Engine(dispatcher)
+            engine.runSelfTest()
+            val request = DeriveRequest("a private master", "example")
+            val pending = async { engine.derive(request) }
+            awaitArgon2()
+            // The wipe now waits for the engine mutex held by the Argon2 run; then its caller goes away.
+            val wipe = launch(start = CoroutineStart.UNDISPATCHED) { engine.wipeSession() }
+            wipe.cancel()
+            pending.await()
+            wipe.join()
+            assertFalse(engine.derive(request).cached)
         }
     }
 }

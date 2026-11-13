@@ -210,12 +210,16 @@ class Spv2Engine(
 
     /**
      * Zeroizes cached session key, HMAC tag, and per-session CSPRNG nonce.
+     * Runs to completion once started: a caller cancelled while waiting for an in-flight
+     * Argon2 run to release the mutex must not leave the key material behind.
      */
     suspend fun wipeSession() {
-        mutex.withLock {
-            clearCachedKeyLocked()
-            Spv2Spec.zeroize(sessionNonce)
-            sessionNonce = null
+        withContext(NonCancellable) {
+            mutex.withLock {
+                clearCachedKeyLocked()
+                Spv2Spec.zeroize(sessionNonce)
+                sessionNonce = null
+            }
         }
     }
 
