@@ -333,6 +333,15 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             "ltd", "plc", "sch"
         )
 
+        // Hosting suffixes under which anyone can publish (`someone.github.io`). The label in
+        // front names the site; the platform's own name must not become its site code.
+        private val USER_CONTENT_SUFFIXES = setOf(
+            "github.io", "gitlab.io", "gitee.io", "bitbucket.io", "codeberg.page", "readthedocs.io",
+            "pages.dev", "workers.dev", "vercel.app", "netlify.app", "web.app", "firebaseapp.com",
+            "appspot.com", "herokuapp.com", "azurewebsites.net", "onrender.com", "glitch.me",
+            "blogspot.com", "neocities.org", "itch.io", "duckdns.org"
+        )
+
         // Package segments that never identify the site (allocated once, not per segment).
         private val PACKAGE_NOISE_SEGMENTS = setOf(
             "com", "org", "net", "io", "app", "me", "co", "cn", "hk", "tw",
@@ -505,6 +514,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (isValidIpv4Literal(clean) || clean.startsWith("[")) return clean
             val parts = clean.split('.').filter { it.isNotEmpty() }
             if (parts.size <= 1) return clean
+            if (parts.size >= 3 && "${parts[parts.size - 2]}.${parts.last()}" in USER_CONTENT_SUFFIXES) {
+                return parts[parts.size - 3]
+            }
             val multiPartSuffix = parts.size >= 3 &&
                 isTwoPartPublicSuffix(parts[parts.size - 2], parts.last())
             return if (multiPartSuffix) {

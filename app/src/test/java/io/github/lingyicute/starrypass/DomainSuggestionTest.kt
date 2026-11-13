@@ -37,6 +37,15 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `user-content hosting suffixes never become the suggested site code`() {
+        assertEquals("someone", PreferencesRepository.suggestCodeFromContext("https://someone.github.io/login", null))
+        assertEquals("project", PreferencesRepository.extractDomainStem("docs.project.gitlab.io"))
+        assertEquals("shop", PreferencesRepository.extractDomainStem("shop.vercel.app"))
+        assertEquals("github", PreferencesRepository.extractDomainStem("github.io"))
+        assertEquals("github", PreferencesRepository.extractDomainStem("gist.github.com"))
+    }
+
+    @Test
     fun `keeps IPv4 addresses whole instead of using the last octet as the site code`() {
         assertEquals("192.168.1.1", PreferencesRepository.suggestCodeFromContext("http://192.168.1.1:8080/login", null))
         assertEquals("192.168.1.1", PreferencesRepository.extractDomainStem("192.168.1.1"))

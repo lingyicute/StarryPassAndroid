@@ -214,6 +214,15 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `autofill matching does not offer the platform preset on a user-content page`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "platform", code = "github"))
+
+        assertEquals(null, repo.findMatchingPreset("https://someone.github.io/login", null)?.id)
+        assertEquals("platform", repo.findMatchingPreset("https://gist.github.com/login", null)?.id)
+    }
+
+    @Test
     fun `decodePresets skips blank codes or duplicate ids and clamps out-of-range fields`() = runBlocking {
         val file = temporaryFolder.newFile("sanitised.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
