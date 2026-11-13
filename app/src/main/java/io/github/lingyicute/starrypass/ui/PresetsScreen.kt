@@ -94,6 +94,7 @@ fun PresetsScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var editingPreset by remember { mutableStateOf<SitePreset?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<SitePreset?>(null) }
 
     val filtered = remember(presets, searchQuery) {
         val q = Spv2Spec.ecmaTrim(searchQuery).lowercase(Locale.ROOT)
@@ -259,7 +260,7 @@ fun PresetsScreen(
                                                 contentDescription = stringResource(R.string.preset_dialog_edit_title)
                                             )
                                         }
-                                        IconButton(onClick = { onDeletePreset(preset.id) }) {
+                                        IconButton(onClick = { pendingDelete = preset }) {
                                             Icon(
                                                 imageVector = Icons.Outlined.DeleteOutline,
                                                 contentDescription = stringResource(R.string.action_delete),
@@ -345,6 +346,30 @@ fun PresetsScreen(
             onConfirm = { updated ->
                 onUpsertPreset(updated)
                 showEditDialog = false
+            }
+        )
+    }
+
+    // A deleted rotation counter cannot be recovered, so never delete on a single tap.
+    pendingDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.preset_delete_confirm_title)) },
+            text = { Text(stringResource(R.string.preset_delete_confirm_message, target.displayName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeletePreset(target.id)
+                        pendingDelete = null
+                    }
+                ) {
+                    Text(stringResource(R.string.action_delete), color = colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
             }
         )
     }
