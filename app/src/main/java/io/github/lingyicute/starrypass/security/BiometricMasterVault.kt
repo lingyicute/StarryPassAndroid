@@ -379,10 +379,15 @@ class BiometricMasterVault(
     /**
      * Destroys the Android Keystore hardware key and wipes encrypted ciphertext.
      */
-    fun clearVault() {
+    fun clearVault(): Boolean {
         cancelPendingAuthentication()
         // Commit before deleting the key so a crash cannot leave ciphertext without its key.
-        prefs.edit().clear().commit()
+        // If that write itself fails, keep both blob and key: deleting the key anyway would
+        // orphan the ciphertext while the state below claimed the vault was revoked.
+        if (!prefs.edit().clear().commit()) {
+            _isEnrolled.value = hasStoredBlob()
+            return false
+        }
         runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (ks.containsAlias(KEY_ALIAS)) {
@@ -390,6 +395,7 @@ class BiometricMasterVault(
             }
         }
         _isEnrolled.value = false
+        return true
     }
 
     private fun hasStoredBlob(): Boolean =
