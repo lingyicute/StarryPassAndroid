@@ -852,6 +852,9 @@ private fun ClipboardCountdownBanner(
     onClearClipboardNow: () -> Unit
 ) {
     val seconds by countdown.collectAsStateWithLifecycle()
+    // Keep the last running value while the banner animates out instead of flashing "0".
+    var shownSeconds by remember { mutableIntStateOf(seconds) }
+    if (seconds > 0) shownSeconds = seconds
     val colorScheme = MaterialTheme.colorScheme
     AnimatedVisibility(
         visible = seconds > 0,
@@ -882,7 +885,7 @@ private fun ClipboardCountdownBanner(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = stringResource(R.string.clipboard_countdown_banner, seconds),
+                        text = stringResource(R.string.clipboard_countdown_banner, shownSeconds),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
