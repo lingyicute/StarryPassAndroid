@@ -161,6 +161,33 @@ internal object AssistStructureParser {
     }
 
     /**
+     * Verifies that the live [AssistStructure] attached to [AutofillAuthActivity] still belongs
+     * to the same origin and package as the initial fill request, and never falls back to stale
+     * field IDs when the live structure parsed cleanly with zero eligible targets.
+     */
+    internal fun <T> resolveAuthenticatedTargets(
+        hasLiveStructure: Boolean,
+        liveParseFailed: Boolean,
+        liveTargets: List<T>,
+        liveWebDomain: String?,
+        livePackageName: String?,
+        expectedWebDomain: String?,
+        expectedPackageName: String?,
+        selfPackageName: String,
+        fallbackTargets: List<T>
+    ): List<T> {
+        if (!hasLiveStructure || liveParseFailed) {
+            if (expectedPackageName == selfPackageName) return emptyList()
+            return fallbackTargets
+        }
+        if (livePackageName == selfPackageName) return emptyList()
+        if (livePackageName != expectedPackageName || liveWebDomain != expectedWebDomain) {
+            return emptyList()
+        }
+        return liveTargets
+    }
+
+    /**
      * A page can embed frames from other sites. A field that explicitly belongs to another
      * domain than the one the password is derived for must never receive that password.
      */

@@ -104,13 +104,14 @@ class StarryPassAutofillService : AutofillService() {
                     ArrayList(targetIds)
                 )
                 putExtra(AutofillAuthActivity.EXTRA_MANUAL_REQUEST, isManualRequest)
+                putExtra(AutofillAuthActivity.EXTRA_EXPECTED_DOMAIN, parsed.webDomain)
+                putExtra(AutofillAuthActivity.EXTRA_EXPECTED_PACKAGE, parsed.packageName)
                 putExtra(AutofillAuthActivity.EXTRA_SUGGESTED_CODE, suggestedCode)
                 putExtra(
                     AutofillAuthActivity.EXTRA_TARGET_LABEL,
                     parsed.webDomain ?: parsed.packageName ?: ""
                 )
                 if (matchedPreset != null) {
-                    putExtra(AutofillAuthActivity.EXTRA_PRESET_ID, matchedPreset.id)
                     putExtra(AutofillAuthActivity.EXTRA_PRESET_MODE, matchedPreset.modeKey)
                     putExtra(AutofillAuthActivity.EXTRA_PRESET_LENGTH, matchedPreset.length)
                     putExtra(AutofillAuthActivity.EXTRA_PRESET_COUNTER, matchedPreset.counter)
