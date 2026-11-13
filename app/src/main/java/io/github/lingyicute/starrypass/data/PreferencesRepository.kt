@@ -376,7 +376,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (!IPV4_ADDRESS.matches(host)) return false
             return host.split('.').all { part ->
                 val octet = part.toIntOrNull() ?: return@all false
-                octet in 0..255
+                // Leading zeroes are read as octal by some URL parsers, so a spelling such
+                // as 010.0.0.1 does not denote the same host everywhere; reject it.
+                (part.length == 1 || !part.startsWith('0')) && octet in 0..255
             }
         }
 
@@ -403,7 +405,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             for (i in segments.indices) {
                 val seg = segments[i]
                 if (seg.contains('.')) {
-                    if (i != segments.lastIndex || !isValidIpv4Literal(seg)) return false
+                    // An embedded IPv4 part is the final 32 bits: compression may precede
+                    // it (`::ffff:1.2.3.4`) but must never follow it (`1.2.3.4::`).
+                    if (i != segments.lastIndex || host.endsWith("::") || !isValidIpv4Literal(seg)) return false
                     groupCount += 2
                 } else {
                     if (!HEX_GROUP.matches(seg)) return false
@@ -476,8 +480,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (s.any { it <= ' ' || Spv2Spec.ecmaTrim(it.toString()).isEmpty() }) return ""
             if (!s.startsWith("[")) {
                 if (s.indexOfAny(charArrayOf('[', ']', '*')) >= 0) return ""
+                if (s.length > 253) return ""
                 val labels = s.split('.')
-                if (labels.any { it.isEmpty() || it.startsWith('-') || it.endsWith('-') }) return ""
+                if (labels.any { it.isEmpty() || it.length > 63 || it.startsWith('-') || it.endsWith('-') }) return ""
                 // Digits and dots only is an IPv4 literal; anything else (`1`, `1.2`, `999.1.1.1`) is not a host.
                 if (s.all { it in '0'..'9' || it == '.' } && !isValidIpv4Literal(s)) return ""
             }
