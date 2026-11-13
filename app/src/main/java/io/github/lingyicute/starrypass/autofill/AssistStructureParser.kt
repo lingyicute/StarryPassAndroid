@@ -109,7 +109,7 @@ internal object AssistStructureParser {
             val root = structure.getWindowNodeAt(i).rootViewNode
             traverseNode(
                 node = root,
-                inheritedDomain = null,
+                inheritedOrigin = NodeOrigin.Native,
                 onDomain = { dom -> if (detectedDomain == null) detectedDomain = dom },
                 onFocusedEditable = { id, dom ->
                     if (focusedEditableId == null) {
@@ -135,6 +135,29 @@ internal object AssistStructureParser {
             webDomain = webDomain,
             packageName = pkgName
         )
+    }
+
+    internal sealed interface NodeOrigin {
+        data object Native : NodeOrigin
+        data class Verified(val domain: String) : NodeOrigin
+        data object UntrustedWeb : NodeOrigin
+    }
+
+    /**
+     * Nodes without their own `webDomain` or `webScheme` inherit [inherited]; nodes that
+     * explicitly declare an untrusted scheme or invalid host become [NodeOrigin.UntrustedWeb]
+     * so they neither inherit a parent frame's domain nor pose as native app fields.
+     */
+    internal fun resolveEffectiveOrigin(
+        rawDomain: String?,
+        rawScheme: String?,
+        inherited: NodeOrigin
+    ): NodeOrigin {
+        val cleanDomain = rawDomain?.let(Spv2Spec::ecmaTrim)?.takeIf { it.isNotEmpty() }
+        val cleanScheme = rawScheme?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
+        if (cleanDomain == null && cleanScheme == null) return inherited
+        val resolved = resolveNodeDomain(cleanDomain, cleanScheme)
+        return if (resolved != null) NodeOrigin.Verified(resolved) else NodeOrigin.UntrustedWeb
     }
 
     /**
@@ -181,7 +204,7 @@ internal object AssistStructureParser {
 
     private fun traverseNode(
         node: AssistStructure.ViewNode,
-        inheritedDomain: String?,
+        inheritedOrigin: NodeOrigin,
         onDomain: (String) -> Unit,
         onFocusedEditable: (AutofillId, String?) -> Unit,
         onPasswordDomain: (String?, Boolean) -> Unit,
@@ -189,14 +212,14 @@ internal object AssistStructureParser {
         editableFields: MutableList<Pair<AutofillId, String?>>
     ) {
         val rawScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) node.webScheme else null
-        val dom = resolveNodeDomain(node.webDomain, rawScheme)
-        if (dom != null) {
-            onDomain(dom)
+        val activeOrigin = resolveEffectiveOrigin(node.webDomain, rawScheme, inheritedOrigin)
+        if (activeOrigin is NodeOrigin.Verified) {
+            onDomain(activeOrigin.domain)
         }
-        val activeDomain = dom ?: inheritedDomain
 
         val autofillId = node.autofillId
-        if (autofillId != null && isFillableTextInput(node)) {
+        if (autofillId != null && activeOrigin !is NodeOrigin.UntrustedWeb && isFillableTextInput(node)) {
+            val activeDomain = (activeOrigin as? NodeOrigin.Verified)?.domain
             editableFields.add(autofillId to activeDomain)
             if (node.isFocused) {
                 onFocusedEditable(autofillId, activeDomain)
@@ -210,7 +233,7 @@ internal object AssistStructureParser {
         for (c in 0 until node.childCount) {
             traverseNode(
                 node = node.getChildAt(c),
-                inheritedDomain = activeDomain,
+                inheritedOrigin = activeOrigin,
                 onDomain = onDomain,
                 onFocusedEditable = onFocusedEditable,
                 onPasswordDomain = onPasswordDomain,

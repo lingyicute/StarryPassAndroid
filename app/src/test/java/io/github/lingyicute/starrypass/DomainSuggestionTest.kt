@@ -184,6 +184,43 @@ class DomainSuggestionTest {
     }
 
     @Test
+    fun `untrusted web subframes neither inherit parent domain nor masquerade as native fields`() {
+        val verifiedParent = AssistStructureParser.NodeOrigin.Verified("github.com")
+        assertEquals(
+            verifiedParent,
+            AssistStructureParser.resolveEffectiveOrigin(null, null, verifiedParent)
+        )
+        assertEquals(
+            AssistStructureParser.NodeOrigin.Native,
+            AssistStructureParser.resolveEffectiveOrigin("  ", null, AssistStructureParser.NodeOrigin.Native)
+        )
+        assertEquals(
+            AssistStructureParser.NodeOrigin.UntrustedWeb,
+            AssistStructureParser.resolveEffectiveOrigin(null, "data", verifiedParent)
+        )
+        assertEquals(
+            AssistStructureParser.NodeOrigin.UntrustedWeb,
+            AssistStructureParser.resolveEffectiveOrigin("evil.com", "ftp", verifiedParent)
+        )
+        assertEquals(
+            AssistStructureParser.NodeOrigin.UntrustedWeb,
+            AssistStructureParser.resolveEffectiveOrigin(
+                "file:///sdcard/phish.html",
+                "file",
+                AssistStructureParser.NodeOrigin.Native
+            )
+        )
+        assertEquals(
+            AssistStructureParser.NodeOrigin.UntrustedWeb,
+            AssistStructureParser.resolveEffectiveOrigin(
+                null,
+                null,
+                AssistStructureParser.NodeOrigin.UntrustedWeb
+            )
+        )
+    }
+
+    @Test
     fun `bilingual string resources have symmetric keys, clean CJK-Latin spacing, and no legacy wording`() {
         val enFile = File("src/main/res/values/strings.xml")
         val zhFile = File("src/main/res/values-zh/strings.xml")
