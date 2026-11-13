@@ -205,6 +205,15 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `autofill matching does not guess a preset from the browser package on a web page`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "browser", code = "chrome"))
+
+        assertEquals(null, repo.findMatchingPreset("https://unknown.example/login", "com.android.chrome")?.id)
+        assertEquals("browser", repo.findMatchingPreset(null, "com.android.chrome")?.id)
+    }
+
+    @Test
     fun `decodePresets skips blank codes or duplicate ids and clamps out-of-range fields`() = runBlocking {
         val file = temporaryFolder.newFile("sanitised.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(scope = scope) { file }
