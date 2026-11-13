@@ -263,7 +263,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }
         }
 
-        if (normPkg != null) {
+        // On a web page the package names the browser, not the site: guessing from it would
+        // offer a preset coded e.g. "chrome" or "microsoft" on every unmatched page.
+        if (normPkg != null && normDomain == null) {
             val pkgStem = suggestCodeFromContext(null, normPkg)
             if (pkgStem.isNotEmpty()) {
                 presets.firstOrNull { preset ->
