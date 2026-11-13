@@ -125,6 +125,7 @@ fun StarryPassRootScreen(
     val clipboardClearedMsg = stringResource(R.string.clipboard_cleared_toast)
     val bioEnrolledMsg = stringResource(R.string.biometric_enrolled_toast)
     val bioRevokedMsg = stringResource(R.string.biometric_revoked_toast)
+    val bioRevokeFailedMsg = stringResource(R.string.biometric_err_revoke)
     val appName = stringResource(R.string.app_name)
 
     Box(
@@ -348,8 +349,8 @@ fun StarryPassRootScreen(
                         )
                     },
                     onRevokeBiometric = {
-                        viewModel.biometricVault.clearVault()
-                        showMessage(bioRevokedMsg)
+                        val revoked = viewModel.biometricVault.clearVault()
+                        showMessage(if (revoked) bioRevokedMsg else bioRevokeFailedMsg)
                     },
                     onRefreshBiometric = {
                         viewModel.biometricVault.refreshState()

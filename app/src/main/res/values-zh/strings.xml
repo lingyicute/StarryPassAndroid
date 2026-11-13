@@ -142,6 +142,7 @@
     <string name="biometric_err_empty_master">请先输入主密码</string>
     <string name="biometric_err_cipher">硬件密钥库加解密操作失败</string>
     <string name="biometric_err_persist">无法保存生物识别保险箱，未存储任何内容</string>
+    <string name="biometric_err_revoke">无法清除生物识别保险箱，请重试</string>
     <string name="biometric_err_not_enrolled">尚未配置生物识别托管</string>
     <string name="biometric_err_key_invalidated">系统生物识别已变更，密钥已失效。请先手动撤销已保存的保险箱，再重新绑定。</string>
     <string name="biometric_err_hardware_unverified">无法确认 Keystore 密钥受安全硬件保护。已有保险箱会保留，可在设置中手动撤销。</string>
