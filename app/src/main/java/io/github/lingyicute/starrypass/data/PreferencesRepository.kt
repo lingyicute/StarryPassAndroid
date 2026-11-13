@@ -232,7 +232,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }.maxByOrNull { (_, pd) -> pd.length }?.let { return it.first }
         }
 
-        if (normPkg != null) {
+        // A WebView or browser reports the *host app's* package, not the page's identity.
+        // A package-only preset must not override the site's own preset (or be offered on
+        // every unrelated web page hosted by that app). For web content, match by domain.
+        if (normDomain == null && normPkg != null) {
             presets.firstOrNull { preset ->
                 val pkg = Spv2Spec.ecmaTrim(preset.autofillPackage)
                 pkg.isNotEmpty() && pkg.equals(normPkg, ignoreCase = true)
