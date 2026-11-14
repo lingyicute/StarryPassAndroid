@@ -686,8 +686,15 @@ fun GeneratorScreen(
                                 )
                             } else {
                                 val placeholderText = when {
+                                    // The 256 MiB advice only makes sense while that tier is selected.
                                     uiState.errorCode == Spv2ErrorCode.OUT_OF_MEMORY ->
-                                        stringResource(R.string.error_derive_oom)
+                                        stringResource(
+                                            if (uiState.tier == Spv2Tier.PARANOID) {
+                                                R.string.error_derive_oom
+                                            } else {
+                                                R.string.error_derive_oom_standard
+                                            }
+                                        )
                                     uiState.errorCode != null ->
                                         stringResource(R.string.error_derive_generic)
                                     uiState.isDeriving ->

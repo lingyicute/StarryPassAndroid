@@ -58,6 +58,7 @@
     <string name="placeholder_complete_both">请填写完整的主密码和代号</string>
     <string name="placeholder_deriving">正在通过 Argon2id 硬化派生…</string>
     <string name="error_derive_oom">当前设备可用内存不足以分配 256 MiB 矩阵，请切换标准档</string>
+    <string name="error_derive_oom_standard">当前设备可用内存不足以完成派生，请关闭其他应用后重试</string>
     <string name="error_derive_generic">派生失败，请重试</string>
 
     <string name="action_copy">复制密码</string>

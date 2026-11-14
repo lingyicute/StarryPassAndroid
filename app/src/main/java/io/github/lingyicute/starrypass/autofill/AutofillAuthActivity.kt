@@ -332,7 +332,11 @@ class AutofillAuthActivity : FragmentActivity() {
                             val outOfMemory = e is OutOfMemoryError ||
                                 (e as? Spv2Exception)?.code == Spv2ErrorCode.OUT_OF_MEMORY
                             errorMsg = getString(
-                                if (outOfMemory) R.string.error_derive_oom else R.string.error_derive_generic
+                                when {
+                                    !outOfMemory -> R.string.error_derive_generic
+                                    request.tier == Spv2Tier.PARANOID -> R.string.error_derive_oom
+                                    else -> R.string.error_derive_oom_standard
+                                }
                             )
                         }
                     }

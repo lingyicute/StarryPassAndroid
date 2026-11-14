@@ -58,6 +58,7 @@
     <string name="placeholder_complete_both">Complete both master password and site code</string>
     <string name="placeholder_deriving">Deriving with Argon2id…</string>
     <string name="error_derive_oom">Insufficient memory for 256 MiB tier on this device</string>
+    <string name="error_derive_oom_standard">Insufficient memory to derive on this device, close other apps and retry</string>
     <string name="error_derive_generic">Derivation failed, please retry</string>
 
     <string name="action_copy">Copy Password</string>
