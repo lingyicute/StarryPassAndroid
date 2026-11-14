@@ -78,8 +78,9 @@ internal class GeneratorDerivationCoordinator(
             if (canKeepState) {
                 if (current != candidate) {
                     state.update { prev ->
-                        if (sameDeriveInputs(prev, candidate)) {
-                            candidate.copy(
+                        val updated = change(prev)
+                        if (sameDeriveInputs(prev, updated)) {
+                            updated.copy(
                                 derivedPassword = prev.derivedPassword,
                                 isDeriving = prev.isDeriving,
                                 lastCached = prev.lastCached,
@@ -126,6 +127,9 @@ internal class GeneratorDerivationCoordinator(
 
         job = scope.launch {
             if (debounceMs > 0) delay(debounceMs)
+            if (seq == sequence) {
+                activeDebounceMs = 0L
+            }
             try {
                 val result = derive(
                     DeriveRequest(

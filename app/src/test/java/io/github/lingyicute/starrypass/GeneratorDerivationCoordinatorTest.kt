@@ -144,6 +144,12 @@ class GeneratorDerivationCoordinatorTest {
         runCurrent()
         assertEquals(1, calls)
 
+        // Once debounce has finished and derive is running, an immediate equivalent update must not restart it.
+        coordinator.updateInputs(0) { it.copy(code = " site ") }
+        runCurrent()
+        assertEquals(1, calls)
+        assertEquals(" site ", state.value.code)
+
         gate.complete(DeriveResult("derived-20", false, 5))
         runCurrent()
         assertEquals("derived-20", state.value.derivedPassword)
