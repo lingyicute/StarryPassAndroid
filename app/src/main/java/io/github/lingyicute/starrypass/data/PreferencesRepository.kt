@@ -238,7 +238,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (normDomain == null && normPkg != null) {
             presets.firstOrNull { preset ->
                 val pkg = Spv2Spec.ecmaTrim(preset.autofillPackage)
-                pkg.isNotEmpty() && pkg.equals(normPkg, ignoreCase = true)
+                // Android package names are case-sensitive application identifiers, unlike DNS names.
+                pkg.isNotEmpty() && pkg == normPkg
             }?.let { return it }
         }
 
