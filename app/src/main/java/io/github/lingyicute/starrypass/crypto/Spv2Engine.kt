@@ -312,35 +312,34 @@ class Spv2Engine(
             val reqClasses = if (length >= mode.requiredClasses.size) mode.requiredClasses else emptyList()
             var result: String? = null
 
-            for (attempt in 0 until Spv2Spec.REJECTION_MAX_ATTEMPTS) {
-                val chars = CharArray(length)
-                val candidate = try {
+            val chars = CharArray(length)
+            try {
+                for (attempt in 0 until Spv2Spec.REJECTION_MAX_ATTEMPTS) {
                     for (i in 0 until length) {
                         chars[i] = pool[stream.uniformInt(pool.length)]
                     }
-                    String(chars)
-                } finally {
-                    Spv2Spec.zeroize(chars)
-                }
 
-                var ok = true
-                for (cls in reqClasses) {
-                    var found = false
-                    for (k in candidate.indices) {
-                        if (cls.indexOf(candidate[k]) != -1) {
-                            found = true
+                    var ok = true
+                    for (cls in reqClasses) {
+                        var found = false
+                        for (k in 0 until length) {
+                            if (cls.indexOf(chars[k]) != -1) {
+                                found = true
+                                break
+                            }
+                        }
+                        if (!found) {
+                            ok = false
                             break
                         }
                     }
-                    if (!found) {
-                        ok = false
+                    if (ok) {
+                        result = String(chars)
                         break
                     }
                 }
-                if (ok) {
-                    result = candidate
-                    break
-                }
+            } finally {
+                Spv2Spec.zeroize(chars)
             }
 
             if (result == null) {
