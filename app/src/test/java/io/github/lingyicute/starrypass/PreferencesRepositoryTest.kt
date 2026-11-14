@@ -372,4 +372,29 @@ class PreferencesRepositoryTest {
         assertEquals("local", repo.findMatchingPreset("http://localhost:8080/login", null)?.id)
         assertEquals(null, repo.findMatchingPreset("http://evil.localhost:8080/login", null)?.id)
     }
+
+    @Test
+    fun `explicit domain or package bindings do not fall back to code heuristics on other origins`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(
+            SitePreset(id = "internal-acme", code = "acme", autofillDomain = "login.acme.internal")
+        )
+        repo.upsertPreset(
+            SitePreset(id = "bound-pkg", code = "protonmail", autofillPackage = "ch.protonmail.android")
+        )
+        repo.upsertPreset(
+            SitePreset(id = "case-pkg", code = "example", autofillPackage = "com.example.app")
+        )
+
+        assertEquals("internal-acme", repo.findMatchingPreset("https://login.acme.internal/sso", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://acme.com/login", null)?.id)
+        assertEquals("internal-acme", repo.findMatchingPreset(null, "com.acme.android")?.id)
+
+        assertEquals("bound-pkg", repo.findMatchingPreset(null, "ch.protonmail.android")?.id)
+        assertEquals(null, repo.findMatchingPreset(null, "io.protonmail.unofficial")?.id)
+        assertEquals("bound-pkg", repo.findMatchingPreset("https://mail.protonmail.com/login", null)?.id)
+
+        assertEquals("case-pkg", repo.findMatchingPreset(null, "com.example.app")?.id)
+        assertEquals(null, repo.findMatchingPreset(null, "COM.EXAMPLE.APP")?.id)
+    }
 }
