@@ -248,11 +248,14 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
 
         if (normDomain != null) {
-            presets.firstOrNull { preset ->
+            // Presets explicitly bound to another domain must not fall back to code heuristics.
+            val domainUnboundPresets = presets.filter { Spv2Spec.ecmaTrim(it.autofillDomain).isEmpty() }
+
+            domainUnboundPresets.firstOrNull { preset ->
                 preset.code.equals(normDomain, ignoreCase = true)
             }?.let { return it }
 
-            presets.mapNotNull { preset ->
+            domainUnboundPresets.mapNotNull { preset ->
                 val codeDomain = normalizeCodeAsDomain(preset.code)
                 if (codeDomain.isNotEmpty() &&
                     (normDomain == codeDomain || (canMatchSubdomains(codeDomain) && normDomain.endsWith(".$codeDomain")))
@@ -265,7 +268,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
             val domainStem = extractDomainStem(normDomain)
             if (domainStem.isNotEmpty()) {
-                presets.firstOrNull { preset ->
+                domainUnboundPresets.firstOrNull { preset ->
                     preset.code.equals(domainStem, ignoreCase = true)
                 }?.let { return it }
             }
@@ -277,7 +280,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val pkgStem = suggestCodeFromContext(null, normPkg)
             if (pkgStem.isNotEmpty()) {
                 presets.firstOrNull { preset ->
-                    preset.code.equals(pkgStem, ignoreCase = true)
+                    Spv2Spec.ecmaTrim(preset.autofillPackage).isEmpty() &&
+                        preset.code.equals(pkgStem, ignoreCase = true)
                 }?.let { return it }
             }
         }
