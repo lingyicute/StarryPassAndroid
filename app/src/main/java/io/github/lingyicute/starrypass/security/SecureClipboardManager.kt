@@ -47,8 +47,16 @@ class SecureClipboardManager(context: Context) {
             val expectedHash = lastCopiedSha256 ?: return@OnPrimaryClipChangedListener
             val clip = runCatching { clipboard.primaryClip }.getOrNull()
             val text = runCatching { clip?.getItemAt(0)?.text?.toString() }.getOrNull()
-            if (ClipboardWipePolicy.isReplacedByOther(expectedHash, clip != null, text)) {
-                replacedByOther = true
+            val clipReadable = clip != null
+            if (ClipboardWipePolicy.isReplacedByOther(expectedHash, clipReadable, text)) {
+                if (clipReadable) {
+                    clearJob?.cancel()
+                    clearJob = null
+                    _remainingSeconds.value = 0
+                    resetTrackedCopy()
+                } else {
+                    replacedByOther = true
+                }
             }
         }
     }
