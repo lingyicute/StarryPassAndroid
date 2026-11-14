@@ -234,6 +234,7 @@ class AutofillAuthActivity : FragmentActivity() {
             var busy by remember { mutableStateOf(false) }
             var errorMsg by remember { mutableStateOf<String?>(null) }
             var deriveJob by remember { mutableStateOf<Job?>(null) }
+            var deriveSeq by remember { mutableIntStateOf(0) }
             var observedWipe by remember { mutableStateOf(app.sessionWipes.generation.value) }
 
             LaunchedEffect(master.isEmpty()) {
@@ -246,6 +247,7 @@ class AutofillAuthActivity : FragmentActivity() {
                 app.sessionWipes.generation.collect { generation ->
                     if (generation != observedWipe) {
                         observedWipe = generation
+                        deriveSeq++
                         deriveJob?.cancel()
                         deriveJob = null
                         app.biometricVault.cancelPendingAuthentication()
@@ -258,6 +260,7 @@ class AutofillAuthActivity : FragmentActivity() {
             }
 
             fun cancelInFlightDerive() {
+                deriveSeq++
                 deriveJob?.cancel()
                 deriveJob = null
                 app.biometricVault.cancelPendingAuthentication()
@@ -279,6 +282,7 @@ class AutofillAuthActivity : FragmentActivity() {
                 val cleanCode = Spv2Spec.ecmaTrim(code)
                 if (secretMaster.isEmpty() || cleanCode.isEmpty()) return
                 counterText = counter.toString()
+                val seq = ++deriveSeq
                 val generation = app.sessionWipes.generation.value
                 val request = DeriveRequest(secretMaster, cleanCode, tier, counter, length, mode)
                 busy = true
@@ -293,8 +297,10 @@ class AutofillAuthActivity : FragmentActivity() {
                                 app.engine.wipeSession()
                             }
                         }
-                        // A wipe or activity cancellation may happen before the result is delivered.
-                        if (!app.sessionWipes.isCurrent(generation) || isFinishing || isDestroyed) return@launch
+                        // A wipe, newer input change, or activity cancellation may happen before the result is delivered.
+                        if (seq != deriveSeq || !app.sessionWipes.isCurrent(generation) || isFinishing || isDestroyed) {
+                            return@launch
+                        }
                         if (copyOnly) {
                             val copied = app.clipboardManager.copySensitivePassword(
                                 label = getString(R.string.app_name),
@@ -320,7 +326,7 @@ class AutofillAuthActivity : FragmentActivity() {
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (e: Throwable) {
-                        if (app.sessionWipes.isCurrent(generation)) {
+                        if (seq == deriveSeq && app.sessionWipes.isCurrent(generation)) {
                             busy = false
                             // Never surface raw enum names such as OUT_OF_MEMORY to the user.
                             val outOfMemory = e is OutOfMemoryError ||
