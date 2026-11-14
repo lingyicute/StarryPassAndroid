@@ -24,6 +24,10 @@ class DomainSuggestionTest {
         assertEquals("mercadolivre", PreferencesRepository.suggestCodeFromContext("login.mercadolivre.com.br", null))
         assertEquals("protonmail", PreferencesRepository.suggestCodeFromContext(null, "ch.protonmail.android"))
         assertEquals("github", PreferencesRepository.suggestCodeFromContext(null, "com.github.android"))
+        // Not every applicationId starts with a TLD; do not discard the app identity itself.
+        assertEquals("example", PreferencesRepository.suggestCodeFromContext(null, "example.app"))
+        assertEquals("protonmail", PreferencesRepository.suggestCodeFromContext(null, "protonmail.android"))
+        assertEquals("google", PreferencesRepository.suggestCodeFromContext(null, "google.android.gms"))
     }
 
     @Test

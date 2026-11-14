@@ -511,8 +511,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }
             if (!packageName.isNullOrBlank()) {
                 val rawParts = Spv2Spec.ecmaTrim(packageName).lowercase(Locale.ROOT).split('.').filter { it.isNotEmpty() }
+                // Only discard a leading segment when it can actually be a TLD. Application IDs
+                // such as `example.app` and `google.android.gms` start with the app identity.
+                val hasLeadingTld = rawParts.size >= 2 &&
+                    (rawParts[0].length == 2 || rawParts[0] in PACKAGE_NOISE_SEGMENTS)
                 val meaningful = rawParts
-                    .drop(if (rawParts.size >= 2) 1 else 0) // drop leading TLD (com, org, ch, de, io, jp, ...)
+                    .drop(if (hasLeadingTld) 1 else 0)
                     .filterNot { it in PACKAGE_NOISE_SEGMENTS }
                 if (meaningful.isNotEmpty()) return meaningful.first()
             }
