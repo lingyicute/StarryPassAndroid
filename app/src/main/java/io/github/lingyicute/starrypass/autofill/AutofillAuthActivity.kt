@@ -173,7 +173,7 @@ class AutofillAuthActivity : FragmentActivity() {
         // while aborting if the live origin/package changed since onFillRequest or no valid targets remain.
         var liveParseFailed = false
         val liveParsed = liveStructure?.let {
-            // A malformed live structure must not crash the sheet; use the service's ids instead.
+            // A malformed live structure must abort filling, not bypass origin revalidation.
             try {
                 AssistStructureParser.parse(it)
             } catch (_: RuntimeException) {

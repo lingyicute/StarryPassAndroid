@@ -166,6 +166,7 @@ internal object AssistStructureParser {
      * Verifies that the live [AssistStructure] attached to [AutofillAuthActivity] still belongs
      * to the same origin and package as the initial fill request, and never falls back to stale
      * field IDs when the live structure parsed cleanly with zero eligible targets.
+     * A supplied but unreadable live structure cannot verify the origin and also fails closed.
      */
     internal fun <T> resolveAuthenticatedTargets(
         hasLiveStructure: Boolean,
@@ -178,7 +179,8 @@ internal object AssistStructureParser {
         selfPackageName: String,
         fallbackTargets: List<T>
     ): List<T> {
-        if (!hasLiveStructure || liveParseFailed) {
+        if (liveParseFailed) return emptyList()
+        if (!hasLiveStructure) {
             if (expectedPackageName == selfPackageName) return emptyList()
             return fallbackTargets
         }
