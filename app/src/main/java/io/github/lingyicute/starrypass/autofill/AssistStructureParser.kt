@@ -277,29 +277,35 @@ internal object AssistStructureParser {
         }
     }
 
+    internal fun isFillableHtmlInput(
+        tag: String,
+        attributes: Sequence<Pair<String?, String?>>
+    ): Boolean {
+        val cleanTag = Spv2Spec.ecmaTrim(tag).lowercase(Locale.ROOT)
+        if (cleanTag != "input" && cleanTag != "textarea") return false
+        var typeSeen = false
+        var type: String? = null
+        for ((rawName, rawValue) in attributes) {
+            val name = rawName?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
+            // HTML boolean attributes are true by presence, including disabled="false".
+            if (name == "disabled" || name == "readonly") return false
+            if (name == "type" && !typeSeen) {
+                typeSeen = true
+                type = rawValue?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
+            }
+        }
+        return cleanTag == "textarea" || type.isNullOrEmpty() || type in HTML_TEXT_INPUT_TYPES
+    }
+
     private fun isFillableTextInput(node: AssistStructure.ViewNode): Boolean {
-        // Inspect HTML tag first so <input type="hidden|submit|button|..."> or <select>/<button>
-        // is never treated as text input even when a WebView reports autofillType == AUTOFILL_TYPE_TEXT.
-        val htmlTag = node.htmlInfo?.tag?.let(Spv2Spec::ecmaTrim)
+        // Inspect HTML first: a WebView may also mark hidden inputs or buttons as text.
+        val htmlInfo = node.htmlInfo
+        val htmlTag = htmlInfo?.tag?.let(Spv2Spec::ecmaTrim)
         if (!htmlTag.isNullOrEmpty()) {
-            val attrs = node.htmlInfo?.attributes
-            if (attrs?.any { attr ->
-                    val name = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
-                    val value = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
-                    (name == "disabled" || name == "readonly") && value != "false"
-                } == true
-            ) {
-                return false
-            }
-            if (htmlTag.equals("input", ignoreCase = true)) {
-                val typeAttr = attrs
-                    ?.firstOrNull { it.first?.let(Spv2Spec::ecmaTrim)?.equals("type", ignoreCase = true) == true }
-                    ?.second
-                    ?.let(Spv2Spec::ecmaTrim)
-                    ?.lowercase(Locale.ROOT)
-                return typeAttr.isNullOrEmpty() || typeAttr in HTML_TEXT_INPUT_TYPES
-            }
-            return htmlTag.equals("textarea", ignoreCase = true)
+            return isFillableHtmlInput(
+                htmlTag,
+                htmlInfo?.attributes.orEmpty().asSequence().map { it.first to it.second }
+            )
         }
         return node.autofillType == View.AUTOFILL_TYPE_TEXT
     }
