@@ -27,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import java.io.File
 import java.io.IOException
+import java.text.Normalizer
 import java.util.Locale
 import java.util.UUID
 
@@ -452,15 +453,25 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
 
         fun normalizeDomain(raw: String): String {
-            var s = Spv2Spec.ecmaTrim(raw).lowercase(Locale.ROOT)
+            var s = Normalizer.normalize(Spv2Spec.ecmaTrim(raw), Normalizer.Form.NFC).lowercase(Locale.ROOT)
             while (WRAPPER_SCHEME_PREFIX.containsMatchIn(s)) {
                 s = Spv2Spec.ecmaTrim(s.replaceFirst(WRAPPER_SCHEME_PREFIX, ""))
             }
             if (NON_NETWORK_URI.containsMatchIn(s)) return ""
-            s = s.replace(SCHEME_PREFIX, "").removePrefix("//")
+            val hasAuthorityPrefix = SCHEME_PREFIX.containsMatchIn(s) || s.startsWith("//")
+            s = when {
+                SCHEME_PREFIX.containsMatchIn(s) -> s.replaceFirst(SCHEME_PREFIX, "")
+                s.startsWith("//") -> s.removePrefix("//")
+                else -> s
+            }
             val end = s.indexOfAny(charArrayOf('/', '\\', '?', '#'))
             if (end >= 0) s = s.substring(0, end)
-            s = Spv2Spec.ecmaTrim(s.substringAfterLast('@'))
+            if (s.contains('@')) {
+                if (!hasAuthorityPrefix) return ""
+                s = Spv2Spec.ecmaTrim(s.substringAfterLast('@'))
+            } else {
+                s = Spv2Spec.ecmaTrim(s)
+            }
             if (s.startsWith("[")) {
                 // IPv6 literal: its colons are part of the host, only a port may follow the bracket.
                 val close = s.indexOf(']')
@@ -501,7 +512,16 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (s.indexOfAny(charArrayOf('[', ']', '*')) >= 0) return ""
                 if (s.length > 253) return ""
                 val labels = s.split('.')
-                if (labels.any { it.isEmpty() || it.length > 63 || it.startsWith('-') || it.endsWith('-') }) return ""
+                if (labels.any { label ->
+                        label.isEmpty() ||
+                            label.length > 63 ||
+                            label.startsWith('-') ||
+                            label.endsWith('-') ||
+                            label.any { ch -> ch.code < 0x80 && ch !in 'a'..'z' && ch !in '0'..'9' && ch != '-' }
+                    }
+                ) {
+                    return ""
+                }
                 // A host whose final label is all ASCII digits must be a valid IPv4 literal (RFC 3696);
                 // this also prevents `www.010.0.0.1` or `www.1.2.3` from bypassing IPv4 checks after stripping `www.`.
                 if (labels.last().all { it in '0'..'9' } && !isValidIpv4Literal(s)) return ""
