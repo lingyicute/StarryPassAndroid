@@ -196,12 +196,22 @@ class Spv2Engine(
             // withContext can discard an already computed result when dispatching back to a
             // cancelled caller. Only clear this request's uncommitted cache when no caller
             // has committed it and no other uncommitted caller is still in flight.
-            withContext(NonCancellable) {
-                mutex.withLock {
-                    val shouldClear = synchronized(cacheStateLock) {
-                        uncommittedOwners.remove(owner) && !cacheCommitted && uncommittedOwners.isEmpty()
+            val hasUncommittedCache = synchronized(cacheStateLock) {
+                if (cacheCommitted) {
+                    uncommittedOwners.remove(owner)
+                    false
+                } else {
+                    owner in uncommittedOwners
+                }
+            }
+            if (hasUncommittedCache) {
+                withContext(NonCancellable) {
+                    mutex.withLock {
+                        val shouldClear = synchronized(cacheStateLock) {
+                            uncommittedOwners.remove(owner) && !cacheCommitted && uncommittedOwners.isEmpty()
+                        }
+                        if (shouldClear) clearCachedKeyLocked()
                     }
-                    if (shouldClear) clearCachedKeyLocked()
                 }
             }
             throw cancelled

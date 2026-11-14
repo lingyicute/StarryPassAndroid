@@ -214,4 +214,29 @@ class Spv2CancellationTest {
             assertFalse(engine.derive(request).cached)
         }
     }
+
+    @Test
+    fun `cancelling a queued request behind Argon2 returns without waiting or clearing active cache`() = runBlocking {
+        workerDispatcher().use { dispatcher ->
+            val engine = Spv2Engine(dispatcher)
+            engine.runSelfTest()
+            val activeReq = DeriveRequest(
+                master = "a private master",
+                code = "alpha",
+                tier = io.github.lingyicute.starrypass.crypto.Spv2Tier.PARANOID
+            )
+            val active = async { engine.derive(activeReq) }
+            awaitArgon2()
+
+            val queued = async(start = CoroutineStart.UNDISPATCHED) {
+                engine.derive(DeriveRequest("a private master", "beta"))
+            }
+            withTimeout(5_000) {
+                queued.cancelAndJoin()
+            }
+            assertTrue(queued.isCancelled)
+            assertFalse(active.await().cached)
+            assertTrue(engine.derive(activeReq.copy(length = 20)).cached)
+        }
+    }
 }
