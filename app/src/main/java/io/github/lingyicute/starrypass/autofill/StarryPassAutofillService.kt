@@ -58,6 +58,7 @@ class StarryPassAutofillService : AutofillService() {
         cancellationSignal: CancellationSignal,
         callback: FillCallback
     ) {
+        if (cancellationSignal.isCanceled) return
         val latestStructure = request.fillContexts.lastOrNull()?.structure
         if (latestStructure == null) {
             callback.onSuccess(null)
@@ -82,7 +83,9 @@ class StarryPassAutofillService : AutofillService() {
 
         // Answer the framework even when preset lookup or dataset building fails.
         val failureHandler = CoroutineExceptionHandler { _, _ ->
-            runCatching { callback.onSuccess(null) }
+            if (!cancellationSignal.isCanceled) {
+                runCatching { callback.onSuccess(null) }
+            }
         }
         val job = serviceScope.launch(failureHandler) {
             val app = application as StarryPassApp
@@ -147,8 +150,9 @@ class StarryPassAutofillService : AutofillService() {
                 request.inlineSuggestionsRequest
                     ?.takeIf { it.maxSuggestionCount > 0 }
                     ?.inlinePresentationSpecs
-                    ?.firstOrNull()
-                    ?.let { spec -> createInlinePresentation(spec, title, subtitle) }
+                    ?.firstNotNullOfOrNull { spec ->
+                        runCatching { createInlinePresentation(spec, title, subtitle) }.getOrNull()
+                    }
             } else {
                 null
             }
@@ -166,7 +170,10 @@ class StarryPassAutofillService : AutofillService() {
                 .addDataset(lockedDataset)
                 .build()
 
-            if (!isActive || cancellationSignal.isCanceled) return@launch
+            if (!isActive || cancellationSignal.isCanceled) {
+                runCatching { pendingIntent.cancel() }
+                return@launch
+            }
             callback.onSuccess(fillResponse)
         }
 
