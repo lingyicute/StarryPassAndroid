@@ -336,7 +336,13 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 counter = Spv2Spec.clampCounter(decoded.counter),
                 tierKey = decoded.tier.key,
                 autofillDomain = normalizeDomain(decoded.autofillDomain),
-                autofillPackage = Spv2Spec.ecmaTrim(decoded.autofillPackage)
+                autofillPackage = Spv2Spec.ecmaTrim(decoded.autofillPackage),
+                // Missing metadata is unknown, not a fresh edit on every collection.
+                updatedAtEpochMs = if (element is JsonObject && "updatedAtEpochMs" in element) {
+                    decoded.updatedAtEpochMs
+                } else {
+                    0L
+                }
             )
         }
     }
