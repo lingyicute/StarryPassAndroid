@@ -507,6 +507,8 @@ private fun PresetEditDialog(
                     value = domain,
                     onValueChange = { domain = it },
                     singleLine = true,
+                    isError = Spv2Spec.ecmaTrim(domain).isNotEmpty() &&
+                        PreferencesRepository.normalizeDomain(domain).isEmpty(),
                     label = { Text(stringResource(R.string.preset_field_domain)) },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
@@ -528,8 +530,11 @@ private fun PresetEditDialog(
             }
         },
         confirmButton = {
+            val trimmedDomain = Spv2Spec.ecmaTrim(domain)
+            val normalizedDomain = PreferencesRepository.normalizeDomain(trimmedDomain)
+            val isDomainInvalid = trimmedDomain.isNotEmpty() && normalizedDomain.isEmpty()
             Button(
-                enabled = Spv2Spec.ecmaTrim(code).isNotEmpty(),
+                enabled = Spv2Spec.ecmaTrim(code).isNotEmpty() && !isDomainInvalid,
                 onClick = {
                     val ctr = Spv2Spec.clampCounter(counter)
                     val result = (initial ?: SitePreset(code = code)).copy(
@@ -539,7 +544,7 @@ private fun PresetEditDialog(
                         modeKey = mode.key,
                         counter = ctr,
                         tierKey = tier.key,
-                        autofillDomain = PreferencesRepository.normalizeDomain(domain),
+                        autofillDomain = normalizedDomain,
                         autofillPackage = Spv2Spec.ecmaTrim(pkg)
                     )
                     onConfirm(result)
