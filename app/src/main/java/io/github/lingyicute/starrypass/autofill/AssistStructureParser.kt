@@ -35,6 +35,8 @@ internal object AssistStructureParser {
     // Compiled once: the parser visits every node of a possibly large view tree.
     private val WHITESPACE_RUN = Regex("\\s+")
     private val WEB_SCHEMES = setOf("http", "https")
+    private val WRAPPER_SCHEME_PREFIX = Regex("^(?:blob|view-source):", RegexOption.IGNORE_CASE)
+    private val EMBEDDED_SCHEME_PREFIX = Regex("^([a-z][a-z0-9+.-]*)://", RegexOption.IGNORE_CASE)
 
     private val PASSWORD_KEYWORDS = listOf(
         "password",
@@ -213,20 +215,23 @@ internal object AssistStructureParser {
         val cleanScheme = rawScheme?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf { it.isNotEmpty() }
         // webScheme is authoritative even when webDomain happens to contain its own URL scheme.
         if (cleanScheme != null && cleanScheme !in WEB_SCHEMES) return null
-        if (cleanScheme != null && cleanDomain.contains("://") &&
-            !cleanDomain.startsWith("$cleanScheme://", ignoreCase = true)
-        ) return null
-        val candidate = if (
-            cleanScheme != null &&
-            !cleanDomain.contains("://") &&
-            !cleanDomain.startsWith("//") &&
-            !cleanDomain.startsWith("$cleanScheme:")
-        ) {
-            "$cleanScheme://$cleanDomain"
+        if (WRAPPER_SCHEME_PREFIX.containsMatchIn(cleanDomain)) return null
+        val embeddedSchemeMatch = EMBEDDED_SCHEME_PREFIX.find(cleanDomain)
+        if (embeddedSchemeMatch != null) {
+            val embeddedScheme = embeddedSchemeMatch.groupValues[1].lowercase(Locale.ROOT)
+            if (embeddedScheme !in WEB_SCHEMES) return null
+            if (cleanScheme != null && embeddedScheme != cleanScheme) return null
         } else {
-            cleanDomain
+            val schemeSep = cleanDomain.indexOf("://")
+            val firstDelim = cleanDomain.indexOfAny(charArrayOf('/', '\\', '?', '#'))
+            if (schemeSep >= 0 && (firstDelim < 0 || schemeSep < firstDelim)) return null
+            if (cleanDomain.startsWith("http:", ignoreCase = true) ||
+                cleanDomain.startsWith("https:", ignoreCase = true)
+            ) {
+                return null
+            }
         }
-        return PreferencesRepository.normalizeDomain(candidate).takeIf { it.isNotEmpty() }
+        return PreferencesRepository.normalizeDomain(cleanDomain).takeIf { it.isNotEmpty() }
     }
 
     private fun traverseNode(

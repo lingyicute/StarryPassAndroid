@@ -154,7 +154,16 @@ class DomainSuggestionTest {
         assertNull(AssistStructureParser.resolveNodeDomain("https://example.com", "file"))
         assertNull(AssistStructureParser.resolveNodeDomain("http://example.com", "content"))
         assertNull(AssistStructureParser.resolveNodeDomain("ftp://example.com", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("ftp://example.com", null))
+        assertNull(AssistStructureParser.resolveNodeDomain("chrome://settings", null))
+        assertNull(AssistStructureParser.resolveNodeDomain("blob:https://example.com/uuid", null))
+        assertNull(AssistStructureParser.resolveNodeDomain("view-source:https://example.com", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("mailto:a@evil.com", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("javascript:123", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("tel:12345", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("https:8080", "https"))
         assertEquals("example.com", AssistStructureParser.resolveNodeDomain("HTTPS://example.com", "HTTPS"))
+        assertEquals("example.com", AssistStructureParser.resolveNodeDomain("https://example.com/login", null))
     }
 
     @Test
