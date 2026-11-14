@@ -66,6 +66,8 @@ class BiometricMasterVault(
     // BiometricPrompt callbacks and this map are confined to the main thread.
     private val activePrompts = mutableMapOf<BiometricPrompt, () -> Unit>()
     private var enrollmentOwner: Any? = null
+    // Keeps revocation retryable if clearing prefs or deleting the hardware key fails partway.
+    private var pendingRevocation = false
 
     fun cancelPendingAuthentication() {
         val pending = activePrompts.toMap()
@@ -90,7 +92,7 @@ class BiometricMasterVault(
     }
 
     fun refreshState() {
-        _isEnrolled.value = hasStoredBlob()
+        _isEnrolled.value = hasStoredBlob() || pendingRevocation
     }
 
     /**
@@ -112,7 +114,7 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_empty_master))
             return
         }
-        if (hasStoredBlob()) {
+        if (hasStoredBlob() || pendingRevocation) {
             onError(activity.getString(R.string.biometric_err_existing_vault))
             return
         }
@@ -381,12 +383,21 @@ class BiometricMasterVault(
      */
     fun clearVault(): Boolean {
         cancelPendingAuthentication()
-        // Commit before deleting the key so a crash cannot leave ciphertext without its key.
-        // If that write itself fails, keep both blob and key: deleting the key anyway would
-        // orphan the ciphertext while the state below claimed the vault was revoked.
-        if (!prefs.edit().clear().commit()) {
-            _isEnrolled.value = hasStoredBlob()
-            return false
+        val prevIv = prefs.getString(PREF_IV, null)
+        val prevCt = prefs.getString(PREF_CT, null)
+        if (!prevIv.isNullOrEmpty() || !prevCt.isNullOrEmpty()) {
+            // Commit before deleting the key so a crash cannot leave ciphertext without its key.
+            // If that write itself fails, SharedPreferencesImpl has already cleared its in-memory
+            // map; restore it and keep revocation available so the user can retry.
+            if (!prefs.edit().clear().commit()) {
+                val restore = prefs.edit()
+                if (prevIv != null) restore.putString(PREF_IV, prevIv)
+                if (prevCt != null) restore.putString(PREF_CT, prevCt)
+                restore.apply()
+                pendingRevocation = true
+                _isEnrolled.value = true
+                return false
+            }
         }
         val keyDeleted = runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -395,7 +406,8 @@ class BiometricMasterVault(
             }
             true
         }.getOrDefault(false)
-        _isEnrolled.value = hasStoredBlob()
+        pendingRevocation = !keyDeleted
+        _isEnrolled.value = hasStoredBlob() || pendingRevocation
         return keyDeleted
     }
 
@@ -417,7 +429,7 @@ class BiometricMasterVault(
     }
 
     private fun discardUnenrolledKey() {
-        if (hasStoredBlob()) return
+        if (hasStoredBlob() || pendingRevocation) return
         runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (ks.containsAlias(KEY_ALIAS)) ks.deleteEntry(KEY_ALIAS)
@@ -430,7 +442,7 @@ class BiometricMasterVault(
     }.getOrNull()
 
     private fun createFreshKeystoreKey(): SecretKey {
-        check(!hasStoredBlob()) { "Existing vault must be revoked explicitly" }
+        check(!hasStoredBlob() && !pendingRevocation) { "Existing vault must be revoked explicitly" }
         val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         if (ks.containsAlias(KEY_ALIAS)) {
             ks.deleteEntry(KEY_ALIAS)
