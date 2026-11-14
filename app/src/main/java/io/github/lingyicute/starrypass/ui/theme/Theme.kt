@@ -6,6 +6,8 @@
 package io.github.lingyicute.starrypass.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -18,7 +20,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -28,6 +30,10 @@ import androidx.core.view.WindowCompat
 import io.github.lingyicute.starrypass.data.ThemePreference
 
 private const val THEME_TRANSITION_MS = 360
+private val ThemeColorSpec = tween<Color>(
+    durationMillis = THEME_TRANSITION_MS,
+    easing = FastOutSlowInEasing
+)
 
 private val StarryLightColorScheme = lightColorScheme(
     primary = LightPrimary,
@@ -103,7 +109,7 @@ private val StarryDarkColorScheme = darkColorScheme(
 private fun animateThemeColor(target: Color, label: String): Color {
     return animateColorAsState(
         targetValue = target,
-        animationSpec = tween(durationMillis = THEME_TRANSITION_MS, easing = FastOutSlowInEasing),
+        animationSpec = ThemeColorSpec,
         label = label
     ).value
 }
@@ -178,11 +184,14 @@ fun StarryPassTheme(
 
     val view = LocalView.current
     if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as? Activity)?.window ?: return@SideEffect
-            val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = !useDark
-            insetsController.isAppearanceLightNavigationBars = !useDark
+        DisposableEffect(view, useDark) {
+            val window = view.context.findActivity()?.window
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.isAppearanceLightStatusBars = !useDark
+                insetsController.isAppearanceLightNavigationBars = !useDark
+            }
+            onDispose { }
         }
     }
 
@@ -191,4 +200,10 @@ fun StarryPassTheme(
         typography = StarryTypography,
         content = content
     )
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
