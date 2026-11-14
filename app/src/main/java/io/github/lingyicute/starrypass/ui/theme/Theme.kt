@@ -5,9 +5,6 @@
  */
 package io.github.lingyicute.starrypass.ui.theme
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import io.github.lingyicute.starrypass.data.ThemePreference
+import io.github.lingyicute.starrypass.findActivity
 
 private const val THEME_TRANSITION_MS = 360
 private val ThemeColorSpec = tween<Color>(
@@ -200,11 +198,4 @@ fun StarryPassTheme(
         typography = StarryTypography,
         content = content
     )
-}
-
-private tailrec fun Context.findActivity(): Activity? {
-    if (this is Activity) return this
-    val base = (this as? ContextWrapper)?.baseContext ?: return null
-    if (base === this) return null
-    return base.findActivity()
 }

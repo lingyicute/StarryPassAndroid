@@ -5,13 +5,11 @@
  */
 package io.github.lingyicute.starrypass.security
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
+import io.github.lingyicute.starrypass.findActivity
 
 @Composable
 fun ScreenSecurityEffect(flagSecureEnabled: Boolean) {
@@ -27,11 +25,4 @@ fun ScreenSecurityEffect(flagSecureEnabled: Boolean) {
         }
         onDispose { }
     }
-}
-
-private tailrec fun Context.findActivity(): Activity? {
-    if (this is Activity) return this
-    val base = (this as? ContextWrapper)?.baseContext ?: return null
-    if (base === this) return null
-    return base.findActivity()
 }
