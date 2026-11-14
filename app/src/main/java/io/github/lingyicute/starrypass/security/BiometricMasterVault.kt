@@ -271,6 +271,10 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_not_ready))
             return
         }
+        if (pendingRevocation) {
+            onError(activity.getString(R.string.biometric_err_revoke))
+            return
+        }
         val ivB64 = prefs.getString(PREF_IV, null)
         val ctB64 = prefs.getString(PREF_CT, null)
         val key = getExistingKeystoreKey()
