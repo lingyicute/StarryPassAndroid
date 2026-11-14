@@ -557,6 +557,12 @@ class AutofillAuthActivity : FragmentActivity() {
                                     keyboardType = KeyboardType.Password,
                                     imeAction = ImeAction.Done
                                 ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        focusManager.clearFocus()
+                                        if (canProceed) triggerAction(copyOnly = false)
+                                    }
+                                ),
                                 modifier = Modifier.fillMaxWidth()
                             )
 
