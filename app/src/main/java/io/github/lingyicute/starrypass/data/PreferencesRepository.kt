@@ -489,7 +489,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
                 val parts = withoutWww.split('.').filter { it.isNotEmpty() }
-                if (parts.size >= 3 || (parts.size == 2 && !isTwoPartPublicSuffix(parts[0], parts[1]))) {
+                if (parts.size >= 3 ||
+                    (parts.size == 2 &&
+                        !isTwoPartPublicSuffix(parts[0], parts[1]) &&
+                        withoutWww !in USER_CONTENT_SUFFIXES)
+                ) {
                     s = withoutWww
                 }
             }
