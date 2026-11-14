@@ -228,7 +228,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             // Entries saved by older versions were normalised by older rules; normalise again.
             presets.mapNotNull { preset ->
                 val pd = normalizeDomain(preset.autofillDomain)
-                if (pd.isNotEmpty() && (normDomain == pd || normDomain.endsWith(".$pd"))) preset to pd else null
+                if (pd.isNotEmpty() && (normDomain == pd || (canMatchSubdomains(pd) && normDomain.endsWith(".$pd")))) {
+                    preset to pd
+                } else {
+                    null
+                }
             }.maxByOrNull { (_, pd) -> pd.length }?.let { return it.first }
         }
 
@@ -251,7 +255,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             presets.mapNotNull { preset ->
                 val codeDomain = normalizeCodeAsDomain(preset.code)
                 if (codeDomain.isNotEmpty() &&
-                    (normDomain == codeDomain || (codeDomain.contains('.') && normDomain.endsWith(".$codeDomain")))
+                    (normDomain == codeDomain || (canMatchSubdomains(codeDomain) && normDomain.endsWith(".$codeDomain")))
                 ) {
                     preset to codeDomain
                 } else {
@@ -279,6 +283,16 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
 
         return null
+    }
+
+    private fun canMatchSubdomains(domain: String): Boolean {
+        if (domain.startsWith("[") || isValidIpv4Literal(domain)) return false
+        val parts = domain.split('.')
+        if (parts.size < 2) return false
+        if (parts.size == 2 && (domain in USER_CONTENT_SUFFIXES || isTwoPartPublicSuffix(parts[0], parts[1]))) {
+            return false
+        }
+        return true
     }
 
     /**

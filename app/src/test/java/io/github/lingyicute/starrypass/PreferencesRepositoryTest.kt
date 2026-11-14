@@ -353,4 +353,23 @@ class PreferencesRepositoryTest {
 
         assertEquals("main", repo.findMatchingPreset("https://github.com/login", null)?.id)
     }
+
+    @Test
+    fun `public suffixes, user-content suffixes, and single-label hosts only match exact domains`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "gh-pages", code = "github.io", autofillDomain = "github.io"))
+        repo.upsertPreset(SitePreset(id = "uk-suffix", code = "co.uk", autofillDomain = "co.uk"))
+        repo.upsertPreset(SitePreset(id = "tld", code = "tld", autofillDomain = "com"))
+        repo.upsertPreset(SitePreset(id = "local", code = "local", autofillDomain = "localhost"))
+        repo.upsertPreset(SitePreset(id = "tenant", code = "tenant", autofillDomain = "someone.github.io"))
+
+        assertEquals("gh-pages", repo.findMatchingPreset("https://github.io/", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://other.github.io/login", null)?.id)
+        assertEquals("tenant", repo.findMatchingPreset("https://docs.someone.github.io/login", null)?.id)
+        assertEquals("uk-suffix", repo.findMatchingPreset("https://co.uk/", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://shop.co.uk/login", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://example.com/login", null)?.id)
+        assertEquals("local", repo.findMatchingPreset("http://localhost:8080/login", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("http://evil.localhost:8080/login", null)?.id)
+    }
 }
