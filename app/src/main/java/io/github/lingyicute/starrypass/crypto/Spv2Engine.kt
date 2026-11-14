@@ -23,6 +23,10 @@ data class DeriveRequest(
     val length: Int = Spv2Spec.DEFAULT_LENGTH,
     val mode: Spv2Mode = Spv2Mode.FULL
 ) {
+    // The generated data-class form would print the master password into logs and crash reports.
+    override fun toString(): String =
+        "DeriveRequest(master=<redacted>, code=<redacted>, tier=$tier, counter=$counter, length=$length, mode=$mode)"
+
     companion object {
         /**
          * Permissive factory matching upstream JS `canonicalizeInputs(req)` for raw string/nullable inputs.
@@ -49,7 +53,10 @@ data class DeriveResult(
     val password: String,
     val cached: Boolean,
     val elapsedMs: Long
-)
+) {
+    override fun toString(): String =
+        "DeriveResult(password=<redacted>, cached=$cached, elapsedMs=$elapsedMs)"
+}
 
 /**
  * Thread-safe, coroutine-friendly StarryPass v2.1 engine.
