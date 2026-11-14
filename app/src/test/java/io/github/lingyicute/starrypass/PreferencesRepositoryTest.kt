@@ -207,6 +207,17 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `explicit package bindings remain case-sensitive`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "upper", code = "upper-app", autofillPackage = "Com.Example.App"))
+        repo.upsertPreset(SitePreset(id = "lower", code = "lower-app", autofillPackage = "com.example.app"))
+
+        assertEquals("upper", repo.findMatchingPreset(null, "Com.Example.App")?.id)
+        assertEquals("lower", repo.findMatchingPreset(null, "com.example.app")?.id)
+        assertEquals(null, repo.findMatchingPreset(null, "COM.EXAMPLE.APP")?.id)
+    }
+
+    @Test
     fun `browser package binding cannot follow the browser onto another website`() = runBlocking {
         val repo = repository()
         repo.upsertPreset(SitePreset(id = "browser", code = "chrome", autofillPackage = "com.android.chrome"))
