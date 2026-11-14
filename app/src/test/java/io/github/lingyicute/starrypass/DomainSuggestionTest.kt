@@ -171,11 +171,27 @@ class DomainSuggestionTest {
         assertNull(AssistStructureParser.resolveNodeDomain("blob:https://example.com/uuid", null))
         assertNull(AssistStructureParser.resolveNodeDomain("view-source:https://example.com", "https"))
         assertNull(AssistStructureParser.resolveNodeDomain("mailto:a@evil.com", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("sip:alice@evil.com", null))
+        assertNull(AssistStructureParser.resolveNodeDomain("acct:alice@evil.com", "https"))
+        assertNull(AssistStructureParser.resolveNodeDomain("alice@evil.com", "https"))
         assertNull(AssistStructureParser.resolveNodeDomain("javascript:123", "https"))
         assertNull(AssistStructureParser.resolveNodeDomain("tel:12345", "https"))
         assertNull(AssistStructureParser.resolveNodeDomain("https:8080", "https"))
         assertEquals("example.com", AssistStructureParser.resolveNodeDomain("HTTPS://example.com", "HTTPS"))
         assertEquals("example.com", AssistStructureParser.resolveNodeDomain("https://example.com/login", null))
+
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("//user:pw@www.example.com/login"))
+        assertEquals("", PreferencesRepository.normalizeDomain("https:////evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("sip:alice@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("acct:alice@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("xmpp:alice@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("http:alice@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("alice@evil.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("bad!host.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("example.com;work"))
+        assertEquals("", PreferencesRepository.normalizeDomain("my_site.com"))
+        assertEquals("", PreferencesRepository.normalizeDomain("github.com(2)"))
+        assertEquals("m\u00fcnchen.de", PreferencesRepository.normalizeDomain("https://mu\u0308nchen.de/login"))
     }
 
     @Test
