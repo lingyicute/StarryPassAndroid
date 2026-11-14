@@ -92,7 +92,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             clipboardAutoClearSeconds = prefs[Keys.CLIPBOARD_AUTO_CLEAR_SEC] ?: 45,
             colorizePassword = prefs[Keys.COLORIZE_PASSWORD] ?: true
         )
-    }
+    }.distinctUntilChanged()
 
     // Unrelated setting changes re-emit the whole snapshot; only re-decode when the JSON changed.
     val presetsFlow: Flow<List<SitePreset>> = safeData
