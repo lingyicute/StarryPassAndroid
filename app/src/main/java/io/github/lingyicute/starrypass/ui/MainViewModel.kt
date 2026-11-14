@@ -45,7 +45,12 @@ data class GeneratorUiState(
     val strength: StrengthEstimate = StrengthEstimate(0, 0, StrengthReason.EMPTY),
     val maskOutput: Boolean = false,
     val katVerified: Boolean = false
-)
+) {
+    override fun toString(): String =
+        "GeneratorUiState(master=<redacted>, code=$code, length=$length, mode=$mode, counter=$counter, " +
+            "tier=$tier, derivedPassword=${if (derivedPassword == null) "null" else "<redacted>"}, " +
+            "isDeriving=$isDeriving, errorCode=$errorCode)"
+}
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
