@@ -37,6 +37,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
@@ -88,6 +90,9 @@ class StarryPassAutofillService : AutofillService() {
                 webDomain = parsed.webDomain,
                 packageName = parsed.packageName
             )
+            ensureActive()
+            if (cancellationSignal.isCanceled) return@launch
+
             val suggestedCode = matchedPreset?.code
                 ?: PreferencesRepository.suggestCodeFromContext(parsed.webDomain, parsed.packageName)
 
@@ -140,6 +145,7 @@ class StarryPassAutofillService : AutofillService() {
 
             val inlinePresentation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 request.inlineSuggestionsRequest
+                    ?.takeIf { it.maxSuggestionCount > 0 }
                     ?.inlinePresentationSpecs
                     ?.firstOrNull()
                     ?.let { spec -> createInlinePresentation(spec, title, subtitle) }
@@ -160,6 +166,7 @@ class StarryPassAutofillService : AutofillService() {
                 .addDataset(lockedDataset)
                 .build()
 
+            if (!isActive || cancellationSignal.isCanceled) return@launch
             callback.onSuccess(fillResponse)
         }
 
