@@ -144,7 +144,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             length = Spv2Spec.clampLength(preset.length),
             counter = Spv2Spec.clampCounter(preset.counter),
             tierKey = preset.tier.key,
-            autofillDomain = normalizeDomain(preset.autofillDomain),
+            autofillDomain = normalizeDomainBinding(preset.autofillDomain),
             autofillPackage = Spv2Spec.ecmaTrim(preset.autofillPackage),
             updatedAtEpochMs = System.currentTimeMillis()
         )
@@ -301,6 +301,11 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         return true
     }
 
+    // Invalid legacy bindings must stay nonempty: erasing one would enable code heuristics
+    // on unrelated sites. Keep it visible so the user can explicitly correct or clear it.
+    private fun normalizeDomainBinding(raw: String): String =
+        normalizeDomain(raw).ifEmpty { Spv2Spec.ecmaTrim(raw) }
+
     /**
      * Decodes entries one by one: a single unreadable preset must not hide the others, nor make
      * the next save overwrite the whole stored list with only the new entry.
@@ -335,7 +340,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 length = Spv2Spec.clampLength(decoded.length),
                 counter = Spv2Spec.clampCounter(decoded.counter),
                 tierKey = decoded.tier.key,
-                autofillDomain = normalizeDomain(decoded.autofillDomain),
+                autofillDomain = normalizeDomainBinding(decoded.autofillDomain),
                 autofillPackage = Spv2Spec.ecmaTrim(decoded.autofillPackage),
                 // Missing metadata is unknown, not a fresh edit on every collection.
                 updatedAtEpochMs = if (element is JsonObject && "updatedAtEpochMs" in element) {
