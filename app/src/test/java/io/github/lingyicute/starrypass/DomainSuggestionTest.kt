@@ -39,6 +39,10 @@ class DomainSuggestionTest {
     @Test
     fun `user-content hosting suffixes never become the suggested site code`() {
         assertEquals("someone", PreferencesRepository.suggestCodeFromContext("https://someone.github.io/login", null))
+        assertEquals("www.github.io", PreferencesRepository.normalizeDomain("https://www.github.io/login"))
+        assertEquals("www", PreferencesRepository.suggestCodeFromContext("https://www.github.io/login", null))
+        assertEquals("www", PreferencesRepository.extractDomainStem("www.vercel.app"))
+        assertEquals("someone", PreferencesRepository.extractDomainStem("www.someone.github.io"))
         assertEquals("project", PreferencesRepository.extractDomainStem("docs.project.gitlab.io"))
         assertEquals("shop", PreferencesRepository.extractDomainStem("shop.vercel.app"))
         assertEquals("github", PreferencesRepository.extractDomainStem("github.io"))
