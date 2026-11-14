@@ -638,10 +638,12 @@ class AutofillAuthActivity : FragmentActivity() {
                                                         SegmentedButton(
                                                             selected = mode == m,
                                                             onClick = {
-                                                                cancelInFlightDerive()
-                                                                if (m == Spv2Mode.PIN && length > 8) length = 6
-                                                                else if (mode == Spv2Mode.PIN && m != Spv2Mode.PIN && length <= 8) length = 16
-                                                                mode = m
+                                                                if (mode != m) {
+                                                                    cancelInFlightDerive()
+                                                                    if (m == Spv2Mode.PIN && length > 8) length = 6
+                                                                    else if (mode == Spv2Mode.PIN && length <= 8) length = 16
+                                                                    mode = m
+                                                                }
                                                             },
                                                             shape = SegmentedButtonDefaults.itemShape(
                                                                 idx,

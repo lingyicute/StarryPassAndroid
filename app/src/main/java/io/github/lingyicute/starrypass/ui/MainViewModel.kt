@@ -163,11 +163,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onModeChanged(newMode: Spv2Mode) {
         derivation.updateInputs(debounceMs = 0L) { current ->
+            if (current.mode == newMode) return@updateInputs current
             val adjustedLen = when {
                 // Mirror upstream UX: selecting PIN while >8 defaults to 6-digit PIN
                 newMode == Spv2Mode.PIN && current.length > 8 -> 6
                 // Returning from short PIN to Full/Alnum restores sensible 16-char default
-                current.mode == Spv2Mode.PIN && newMode != Spv2Mode.PIN && current.length <= 8 -> 16
+                current.mode == Spv2Mode.PIN && current.length <= 8 -> 16
                 else -> current.length
             }
             current.copy(mode = newMode, length = adjustedLen)
