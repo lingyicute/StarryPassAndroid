@@ -484,8 +484,9 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 if (s.length > 253) return ""
                 val labels = s.split('.')
                 if (labels.any { it.isEmpty() || it.length > 63 || it.startsWith('-') || it.endsWith('-') }) return ""
-                // Digits and dots only is an IPv4 literal; anything else (`1`, `1.2`, `999.1.1.1`) is not a host.
-                if (s.all { it in '0'..'9' || it == '.' } && !isValidIpv4Literal(s)) return ""
+                // A host whose final label is all ASCII digits must be a valid IPv4 literal (RFC 3696);
+                // this also prevents `www.010.0.0.1` or `www.1.2.3` from bypassing IPv4 checks after stripping `www.`.
+                if (labels.last().all { it in '0'..'9' } && !isValidIpv4Literal(s)) return ""
             }
             if (s.startsWith("www.")) {
                 val withoutWww = s.removePrefix("www.").trimStart('.')
