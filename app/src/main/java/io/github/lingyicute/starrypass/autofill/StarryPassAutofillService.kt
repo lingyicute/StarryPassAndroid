@@ -141,40 +141,47 @@ class StarryPassAutofillService : AutofillService() {
                 pendingFlags
             )
 
-            val dropdownView = RemoteViews(packageName, R.layout.autofill_suggestion_item).apply {
-                setTextViewText(R.id.autofill_title, title)
-                setTextViewText(R.id.autofill_subtitle, subtitle)
+            var delivered = false
+            try {
+                val dropdownView = RemoteViews(packageName, R.layout.autofill_suggestion_item).apply {
+                    setTextViewText(R.id.autofill_title, title)
+                    setTextViewText(R.id.autofill_subtitle, subtitle)
+                }
+
+                val inlinePresentation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    request.inlineSuggestionsRequest
+                        ?.takeIf { it.maxSuggestionCount > 0 }
+                        ?.inlinePresentationSpecs
+                        ?.firstNotNullOfOrNull { spec ->
+                            runCatching { createInlinePresentation(spec, title, subtitle) }.getOrNull()
+                        }
+                } else {
+                    null
+                }
+
+                // Dataset-level authentication: when AutofillAuthActivity returns a populated Dataset in
+                // EXTRA_AUTHENTICATION_RESULT, Android immediately replaces this locked Dataset and fills the fields!
+                val lockedDataset = buildAuthenticatedDataset(
+                    targetIds = targetIds,
+                    pendingIntent = pendingIntent,
+                    dropdownView = dropdownView,
+                    inlinePresentation = inlinePresentation
+                )
+
+                val fillResponse = FillResponse.Builder()
+                    .addDataset(lockedDataset)
+                    .build()
+
+                if (!isActive || cancellationSignal.isCanceled) {
+                    return@launch
+                }
+                callback.onSuccess(fillResponse)
+                delivered = true
+            } finally {
+                if (!delivered) {
+                    runCatching { pendingIntent.cancel() }
+                }
             }
-
-            val inlinePresentation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                request.inlineSuggestionsRequest
-                    ?.takeIf { it.maxSuggestionCount > 0 }
-                    ?.inlinePresentationSpecs
-                    ?.firstNotNullOfOrNull { spec ->
-                        runCatching { createInlinePresentation(spec, title, subtitle) }.getOrNull()
-                    }
-            } else {
-                null
-            }
-
-            // Dataset-level authentication: when AutofillAuthActivity returns a populated Dataset in
-            // EXTRA_AUTHENTICATION_RESULT, Android immediately replaces this locked Dataset and fills the fields!
-            val lockedDataset = buildAuthenticatedDataset(
-                targetIds = targetIds,
-                pendingIntent = pendingIntent,
-                dropdownView = dropdownView,
-                inlinePresentation = inlinePresentation
-            )
-
-            val fillResponse = FillResponse.Builder()
-                .addDataset(lockedDataset)
-                .build()
-
-            if (!isActive || cancellationSignal.isCanceled) {
-                runCatching { pendingIntent.cancel() }
-                return@launch
-            }
-            callback.onSuccess(fillResponse)
         }
 
         cancellationSignal.setOnCancelListener { job.cancel() }
