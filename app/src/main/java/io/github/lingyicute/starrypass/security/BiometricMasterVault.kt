@@ -388,14 +388,15 @@ class BiometricMasterVault(
             _isEnrolled.value = hasStoredBlob()
             return false
         }
-        runCatching {
+        val keyDeleted = runCatching {
             val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
             if (ks.containsAlias(KEY_ALIAS)) {
                 ks.deleteEntry(KEY_ALIAS)
             }
-        }
-        _isEnrolled.value = false
-        return true
+            true
+        }.getOrDefault(false)
+        _isEnrolled.value = hasStoredBlob()
+        return keyDeleted
     }
 
     private fun hasStoredBlob(): Boolean =
