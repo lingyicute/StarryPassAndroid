@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.io.IOException
 import java.text.Normalizer
@@ -316,7 +317,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }.getOrNull() ?: return@mapNotNull null
             val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
             if (cleanCode.isEmpty()) return@mapNotNull null
-            val cleanId = Spv2Spec.ecmaTrim(decoded.id).ifEmpty {
+            // Deserialization runs SitePreset's random default when an old entry has no id.
+            // Treat an absent id like a blank one so subsequent edits can find the same entry.
+            val storedId = if (element is JsonObject && "id" in element) decoded.id else ""
+            val cleanId = Spv2Spec.ecmaTrim(storedId).ifEmpty {
                 UUID.nameUUIDFromBytes(cleanCode.toByteArray(Charsets.UTF_8)).toString()
             }
             // Check both before recording either, so a rejected entry cannot reserve its id.
