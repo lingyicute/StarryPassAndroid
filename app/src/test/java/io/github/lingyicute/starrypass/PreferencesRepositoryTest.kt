@@ -190,6 +190,15 @@ class PreferencesRepositoryTest {
     }
 
     @Test
+    fun `internationalised domain binding matches the punycode host reported by browsers`() = runBlocking {
+        val repo = repository()
+        repo.upsertPreset(SitePreset(id = "idn", code = "city", autofillDomain = "m\u00fcnchen.de"))
+
+        assertEquals("xn--mnchen-3ya.de", repo.presetsFlow.first().single().autofillDomain)
+        assertEquals("idn", repo.findMatchingPreset("https://www.xn--mnchen-3ya.de/login", null)?.id)
+    }
+
+    @Test
     fun `autofill matching uses web domain instead of host app package when both are present`() = runBlocking {
         val repo = repository()
         val exactDomainCode = SitePreset(id = "exact", code = "gist.github.com")

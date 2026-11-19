@@ -28,6 +28,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.io.IOException
+import java.net.IDN
 import java.text.Normalizer
 import java.util.Locale
 import java.util.UUID
@@ -523,6 +524,17 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             s = s.trimEnd('.')
             if (s.isEmpty() || s == "*" || (!s.startsWith("[") && s.contains(".."))) return ""
             if (s.any { it <= ' ' || Spv2Spec.ecmaTrim(it.toString()).isEmpty() }) return ""
+            if (s.any { it.code >= 0x80 }) {
+                // Browsers report internationalised hosts in ASCII (punycode) form. Refuse names
+                // that IDNA2003 maps to different characters (ß -> ss), i.e. to another host.
+                val ascii = try {
+                    IDN.toASCII(s, IDN.ALLOW_UNASSIGNED)
+                } catch (_: IllegalArgumentException) {
+                    return ""
+                }
+                if (IDN.toUnicode(ascii, IDN.ALLOW_UNASSIGNED) != s) return ""
+                s = ascii
+            }
             if (!s.startsWith("[")) {
                 if (s.indexOfAny(charArrayOf('[', ']', '*')) >= 0) return ""
                 if (s.length > 253) return ""

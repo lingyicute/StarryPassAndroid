@@ -191,7 +191,11 @@ class DomainSuggestionTest {
         assertEquals("", PreferencesRepository.normalizeDomain("example.com;work"))
         assertEquals("", PreferencesRepository.normalizeDomain("my_site.com"))
         assertEquals("", PreferencesRepository.normalizeDomain("github.com(2)"))
-        assertEquals("m\u00fcnchen.de", PreferencesRepository.normalizeDomain("https://mu\u0308nchen.de/login"))
+        // Browsers report IDN hosts in punycode, so a Unicode entry is stored in the same form.
+        assertEquals("xn--mnchen-3ya.de", PreferencesRepository.normalizeDomain("https://mu\u0308nchen.de/login"))
+        assertEquals("xn--mnchen-3ya.de", PreferencesRepository.normalizeDomain("www.xn--mnchen-3ya.de"))
+        // IDNA2003 would silently map this name onto the unrelated host strasse.de.
+        assertEquals("", PreferencesRepository.normalizeDomain("stra\u00dfe.de"))
     }
 
     @Test
