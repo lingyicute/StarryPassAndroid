@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 data class GeneratorUiState(
     val master: String = "",
@@ -201,11 +202,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // A failed write (e.g. disk full) must not crash the app; the stored value stays unchanged.
+    private fun launchWrite(block: suspend () -> Unit) = viewModelScope.launch {
+        try {
+            block()
+        } catch (_: IOException) {
+        }
+    }
+
     fun saveCurrentAsPreset(onSaved: () -> Unit) {
         val s = _uiState.value
         val trimmedCode = Spv2Spec.ecmaTrim(s.code)
         if (trimmedCode.isEmpty()) return
-        viewModelScope.launch {
+        launchWrite {
             prefsRepo.savePresetPolicy(
                 SitePreset(
                     code = trimmedCode,
@@ -240,7 +249,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (synced) {
             syncGeneratorPolicy()
         }
-        viewModelScope.launch {
+        launchWrite {
             if (!synced) {
                 val storedCode = prefsRepo.presetsFlow.first().firstOrNull { it.id == cleanId }?.code
                 if (storedCode != null && Spv2Spec.ecmaTrim(_uiState.value.code) == storedCode) {
@@ -252,11 +261,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deletePreset(id: String) {
-        viewModelScope.launch { prefsRepo.deletePreset(id) }
+        launchWrite { prefsRepo.deletePreset(id) }
     }
 
     fun incrementPresetRotation(id: String, onResult: (PresetRotationResult) -> Unit) {
-        viewModelScope.launch {
+        launchWrite {
             val result = prefsRepo.incrementPresetCounter(id)
             if (result is PresetRotationResult.Updated) {
                 // If this preset's code is currently active in the generator, sync its policy too!
@@ -282,7 +291,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Settings updates
     fun setTheme(theme: ThemePreference) {
-        viewModelScope.launch { prefsRepo.setTheme(theme) }
+        launchWrite { prefsRepo.setTheme(theme) }
     }
 
     fun cycleTheme() {
@@ -295,25 +304,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { prefsRepo.setDynamicColor(enabled) }
+        launchWrite { prefsRepo.setDynamicColor(enabled) }
     }
 
     fun setFlagSecure(enabled: Boolean) {
-        viewModelScope.launch { prefsRepo.setFlagSecure(enabled) }
+        launchWrite { prefsRepo.setFlagSecure(enabled) }
     }
 
     fun setWipeOnBackground(enabled: Boolean) {
-        viewModelScope.launch { prefsRepo.setWipeOnBackground(enabled) }
+        launchWrite { prefsRepo.setWipeOnBackground(enabled) }
     }
 
     fun setClipboardAutoClearSeconds(seconds: Int) {
         val coerced = seconds.coerceAtLeast(0)
         clipboardManager.onAutoClearTimeoutChanged(coerced)
-        viewModelScope.launch { prefsRepo.setClipboardAutoClearSeconds(coerced) }
+        launchWrite { prefsRepo.setClipboardAutoClearSeconds(coerced) }
     }
 
     fun setColorizePassword(enabled: Boolean) {
-        viewModelScope.launch { prefsRepo.setColorizePassword(enabled) }
+        launchWrite { prefsRepo.setColorizePassword(enabled) }
     }
 
     fun queryBiometricHardware(): BiometricHardwareStatus = biometricVault.queryHardwareStatus()
