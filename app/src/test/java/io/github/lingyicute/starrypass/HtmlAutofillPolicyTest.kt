@@ -67,4 +67,15 @@ class HtmlAutofillPolicyTest {
         assertFalse(fillable("input", "type" to "password", "disabled" to ""))
         assertFalse(fillable("textarea", "type" to "text", "readonly" to null))
     }
+
+    @Test
+    fun `credit card autocomplete tokens exclude masked CVV fields from password detection`() {
+        val card = AssistStructureParser::hasCreditCardHtmlAutocomplete
+        assertTrue(card(sequenceOf("type" to "password", "autocomplete" to "cc-csc")))
+        assertTrue(card(sequenceOf("AUTOCOMPLETE" to " section-checkout CC-NUMBER ")))
+        assertTrue(card(sequenceOf("autocomplete" to "creditcardNumber")))
+        assertFalse(card(sequenceOf("autocomplete" to "current-password")))
+        assertFalse(card(sequenceOf("autocomplete" to "section-cc-csc current-password")))
+        assertFalse(card(sequenceOf("aria-autocomplete" to "cc-csc")))
+    }
 }

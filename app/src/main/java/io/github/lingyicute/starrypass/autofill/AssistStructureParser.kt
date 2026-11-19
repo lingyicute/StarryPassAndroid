@@ -310,13 +310,27 @@ internal object AssistStructureParser {
         return node.autofillType == View.AUTOFILL_TYPE_TEXT
     }
 
+    /** HTML card autofill tokens can appear alongside `type=password` on masked CVV fields. */
+    internal fun hasCreditCardHtmlAutocomplete(attributes: Sequence<Pair<String?, String?>>): Boolean =
+        attributes.any { (rawName, rawValue) ->
+            rawName?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) == "autocomplete" &&
+                rawValue?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
+                    ?.split(WHITESPACE_RUN)?.any { it.startsWith("cc-") || it.startsWith("creditcard") } == true
+        }
+
     private fun isPasswordNode(node: AssistStructure.ViewNode): Boolean {
-        // 1. Explicit Android autofillHints
+        val htmlAttrs = node.htmlInfo?.attributes
+        if (htmlAttrs != null && hasCreditCardHtmlAutocomplete(htmlAttrs.asSequence().map { it.first to it.second })) {
+            return false
+        }
+
+        // 1. Explicit Android autofillHints: card fields win even if a conflicting password hint exists.
         val hints = node.autofillHints
         if (!hints.isNullOrEmpty()) {
             val cleanHints = hints.mapNotNull {
                 it?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty)
             }
+            if (cleanHints.any { it.startsWith("creditcard") || it.startsWith("cc-") }) return false
             if (cleanHints.any { hint ->
                     hint == View.AUTOFILL_HINT_PASSWORD.lowercase(Locale.ROOT) ||
                         hint.contains("password") ||
@@ -334,10 +348,7 @@ internal object AssistStructureParser {
                         hint.contains("phone") ||
                         hint == View.AUTOFILL_HINT_NAME.lowercase(Locale.ROOT) ||
                         hint == "one-time-code" ||
-                        hint.contains("otp") ||
-                        // Card fields (often numeric-password CVV inputs) are never site passwords.
-                        hint.startsWith("creditcard") ||
-                        hint.startsWith("cc-")
+                        hint.contains("otp")
                 }
             ) {
                 return false
@@ -347,7 +358,6 @@ internal object AssistStructureParser {
         // 2. HTML <input> attributes in browsers / WebViews
         var explicitNonPasswordHtml = false
         var htmlKeywordMatched = false
-        val htmlAttrs = node.htmlInfo?.attributes
         if (htmlAttrs != null) {
             for (attr in htmlAttrs) {
                 val attrName = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
