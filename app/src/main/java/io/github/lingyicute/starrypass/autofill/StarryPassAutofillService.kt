@@ -115,9 +115,11 @@ class StarryPassAutofillService : AutofillService() {
                 putExtra(AutofillAuthActivity.EXTRA_EXPECTED_DOMAIN, parsed.webDomain)
                 putExtra(AutofillAuthActivity.EXTRA_EXPECTED_PACKAGE, parsed.packageName)
                 putExtra(AutofillAuthActivity.EXTRA_SUGGESTED_CODE, suggestedCode)
+                // Any app can claim a web domain for its own fields, so always name the app
+                // that will actually receive the password next to it.
                 putExtra(
                     AutofillAuthActivity.EXTRA_TARGET_LABEL,
-                    parsed.webDomain ?: parsed.packageName ?: ""
+                    listOfNotNull(parsed.webDomain, parsed.packageName).joinToString(" · ")
                 )
                 if (matchedPreset != null) {
                     putExtra(AutofillAuthActivity.EXTRA_PRESET_MODE, matchedPreset.modeKey)
