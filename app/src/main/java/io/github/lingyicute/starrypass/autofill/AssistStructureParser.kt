@@ -334,7 +334,10 @@ internal object AssistStructureParser {
                         hint.contains("phone") ||
                         hint == View.AUTOFILL_HINT_NAME.lowercase(Locale.ROOT) ||
                         hint == "one-time-code" ||
-                        hint.contains("otp")
+                        hint.contains("otp") ||
+                        // Card fields (often numeric-password CVV inputs) are never site passwords.
+                        hint.startsWith("creditcard") ||
+                        hint.startsWith("cc-")
                 }
             ) {
                 return false
