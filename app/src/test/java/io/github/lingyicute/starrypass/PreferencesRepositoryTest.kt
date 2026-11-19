@@ -321,7 +321,7 @@ class PreferencesRepositoryTest {
         assertEquals("", saved.alias)
         assertEquals("github.com", saved.displayName)
         assertEquals("com.github.android", saved.autofillPackage)
-        assertEquals(saved.id, repo.findMatchingPreset("https://sso.github.com/login", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://sso.github.com/login", null)?.id)
         assertEquals(saved.id, repo.findMatchingPreset(null, "\uFEFFcom.github.android\u00A0")?.id)
 
         // Renaming via the original untrimmed preset reference must update in place rather than drop the edit.
@@ -329,6 +329,9 @@ class PreferencesRepositoryTest {
         val renamed = repo.presetsFlow.first().single()
         assertEquals("id-domain", renamed.id)
         assertEquals("gitlab.com", renamed.code)
+
+        repo.upsertPreset(SitePreset(id = "unbound-parent", code = "github.com"))
+        assertEquals("unbound-parent", repo.findMatchingPreset("https://sso.github.com/login", null)?.id)
     }
 
     @Test
@@ -397,13 +400,19 @@ class PreferencesRepositoryTest {
 
         assertEquals("internal-acme", repo.findMatchingPreset("https://login.acme.internal/sso", null)?.id)
         assertEquals(null, repo.findMatchingPreset("https://acme.com/login", null)?.id)
-        assertEquals("internal-acme", repo.findMatchingPreset(null, "com.acme.android")?.id)
+        assertEquals(null, repo.findMatchingPreset(null, "com.acme.android")?.id)
 
         assertEquals("bound-pkg", repo.findMatchingPreset(null, "ch.protonmail.android")?.id)
         assertEquals(null, repo.findMatchingPreset(null, "io.protonmail.unofficial")?.id)
-        assertEquals("bound-pkg", repo.findMatchingPreset("https://mail.protonmail.com/login", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://mail.protonmail.com/login", null)?.id)
+        assertEquals(null, repo.findMatchingPreset("https://example.com/login", "com.other.app")?.id)
 
         assertEquals("case-pkg", repo.findMatchingPreset(null, "com.example.app")?.id)
         assertEquals(null, repo.findMatchingPreset(null, "COM.EXAMPLE.APP")?.id)
+
+        // Only truly unbound presets retain the convenient site/app-name guessing behavior.
+        repo.upsertPreset(SitePreset(id = "unbound", code = "github"))
+        assertEquals("unbound", repo.findMatchingPreset("https://github.com/login", null)?.id)
+        assertEquals("unbound", repo.findMatchingPreset(null, "com.github.android")?.id)
     }
 }

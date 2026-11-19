@@ -251,8 +251,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
 
         if (normDomain != null) {
-            // Presets explicitly bound to another domain must not fall back to code heuristics.
-            val domainUnboundPresets = presets.filter { Spv2Spec.ecmaTrim(it.autofillDomain).isEmpty() }
+            // A binding to either an app or a website must not fall back to guessing from
+            // an unrelated website's name. Explicit domain matches were handled above.
+            val domainUnboundPresets = presets.filter {
+                Spv2Spec.ecmaTrim(it.autofillDomain).isEmpty() &&
+                    Spv2Spec.ecmaTrim(it.autofillPackage).isEmpty()
+            }
 
             domainUnboundPresets.firstOrNull { preset ->
                 preset.code.equals(normDomain, ignoreCase = true)
@@ -283,7 +287,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             val pkgStem = suggestCodeFromContext(null, normPkg)
             if (pkgStem.isNotEmpty()) {
                 presets.firstOrNull { preset ->
-                    Spv2Spec.ecmaTrim(preset.autofillPackage).isEmpty() &&
+                    Spv2Spec.ecmaTrim(preset.autofillDomain).isEmpty() &&
+                        Spv2Spec.ecmaTrim(preset.autofillPackage).isEmpty() &&
                         preset.code.equals(pkgStem, ignoreCase = true)
                 }?.let { return it }
             }
