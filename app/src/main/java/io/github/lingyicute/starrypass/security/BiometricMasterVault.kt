@@ -282,7 +282,12 @@ class BiometricMasterVault(
             onError(activity.getString(R.string.biometric_err_not_enrolled))
             return
         }
-        if (key == null || !isHardwareBacked(key)) {
+        if (key == null) {
+            // System biometric or lock-screen changes can delete the key; keep the blob for explicit revocation.
+            onError(activity.getString(R.string.biometric_err_key_invalidated))
+            return
+        }
+        if (!isHardwareBacked(key)) {
             // Preserve the existing ciphertext and key for explicit user revocation.
             onError(activity.getString(R.string.biometric_err_hardware_unverified))
             return
