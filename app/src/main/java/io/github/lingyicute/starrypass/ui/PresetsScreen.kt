@@ -341,6 +341,7 @@ fun PresetsScreen(
     if (showEditDialog) {
         PresetEditDialog(
             initial = editingPreset,
+            existingPresets = presets,
             onDismiss = { showEditDialog = false },
             onConfirm = { updated ->
                 onUpsertPreset(updated)
@@ -378,6 +379,7 @@ fun PresetsScreen(
 @Composable
 private fun PresetEditDialog(
     initial: SitePreset?,
+    existingPresets: List<SitePreset>,
     onDismiss: () -> Unit,
     onConfirm: (SitePreset) -> Unit
 ) {
@@ -393,6 +395,11 @@ private fun PresetEditDialog(
     var pkg by remember { mutableStateOf(initial?.autofillPackage ?: "") }
     val parsedCounter = counterText.toIntOrNull()
     val isCounterValid = parsedCounter != null && parsedCounter in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER
+    // Saving under a code that another preset owns replaces that preset, silently discarding its
+    // rotation counter; require the user to edit or delete the other entry explicitly instead.
+    val trimmedCode = Spv2Spec.ecmaTrim(code)
+    val isCodeTaken = trimmedCode.isNotEmpty() &&
+        existingPresets.any { it.code == trimmedCode && it.id != initial?.id }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -414,6 +421,12 @@ private fun PresetEditDialog(
                     value = code,
                     onValueChange = { code = it },
                     singleLine = true,
+                    isError = isCodeTaken,
+                    supportingText = if (isCodeTaken) {
+                        { Text(stringResource(R.string.preset_code_taken)) }
+                    } else {
+                        null
+                    },
                     label = { Text(stringResource(R.string.field_code_label)) },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
@@ -536,11 +549,11 @@ private fun PresetEditDialog(
             val normalizedDomain = PreferencesRepository.normalizeDomain(trimmedDomain)
             val isDomainInvalid = trimmedDomain.isNotEmpty() && normalizedDomain.isEmpty()
             Button(
-                enabled = Spv2Spec.ecmaTrim(code).isNotEmpty() && !isDomainInvalid && isCounterValid,
+                enabled = trimmedCode.isNotEmpty() && !isCodeTaken && !isDomainInvalid && isCounterValid,
                 onClick = {
                     val ctr = Spv2Spec.clampCounter(counter)
                     val result = (initial ?: SitePreset(code = code)).copy(
-                        code = Spv2Spec.ecmaTrim(code),
+                        code = trimmedCode,
                         alias = Spv2Spec.ecmaTrim(alias),
                         length = Spv2Spec.clampLength(length),
                         modeKey = mode.key,

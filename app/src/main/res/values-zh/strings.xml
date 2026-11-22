@@ -104,6 +104,7 @@
     <string name="preset_field_alias">显示别名（选填，如 GitHub 主号）</string>
     <string name="preset_field_domain">自动填充匹配域名（选填，如 github.com）</string>
     <string name="preset_field_package">自动填充匹配包名（选填，如 com.github.android）</string>
+    <string name="preset_code_taken">已有其他预设使用此代号，保存会覆盖其轮换序号。</string>
     <string name="preset_rotate_plus_one">轮换 +1</string>
     <string name="preset_rotated_toast">已将「%1$s」轮换序号升至 #%2$d</string>
     <string name="preset_rotation_limit_button">已达上限 9999</string>
