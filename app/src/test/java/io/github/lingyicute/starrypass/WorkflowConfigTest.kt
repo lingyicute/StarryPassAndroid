@@ -21,7 +21,7 @@ class WorkflowConfigTest {
         val workflow = workflowFile.readText()
         assertTrue(workflow.contains("contents: read"))
         assertTrue(workflow.contains("contents: write"))
-        assertTrue(workflow.contains("uses: actions/checkout@v4"))
+        assertTrue(Regex("uses: actions/checkout@[0-9a-f]{40}").containsMatchIn(workflow))
         assertFalse(workflow.contains("fetch-depth: 0"))
         assertTrue(workflow.contains("bash gradlew --no-daemon testDebugUnitTest assembleRelease"))
         assertTrue(workflow.contains("path: app/build/outputs/apk/release/app-release-unsigned.apk"))
@@ -47,5 +47,12 @@ class WorkflowConfigTest {
             .filter { it.isFile && (it.extension == "jks" || it.extension == "keystore") }
             .toList()
         assertTrue("Repository must not contain keystore files: $strayKeystores", strayKeystores.isEmpty())
+    }
+    @Test
+    fun `every third party action is pinned to an immutable commit`() {
+        val workflow = File("../.github/workflows/create-release.yml").readText()
+        val actions = Regex("""uses: \S+@(\S+)""").findAll(workflow).toList()
+        assertTrue(actions.isNotEmpty())
+        actions.forEach { assertTrue(it.value, Regex("[0-9a-f]{40}").matches(it.groupValues[1])) }
     }
 }
