@@ -77,7 +77,7 @@
 - **原生 Material You（Material 3）动态取色与平滑过渡**：
   - Android 12+ 默认开启 **Monet 动态壁纸取色**（`dynamicLightColorScheme` / `dynamicDarkColorScheme`），Android 8 ~ 11 及关闭动态取色时回退至星愿蓝 M3 调色板（`#415F91` / `#AAC7FF`）；
   - 全量 36 个色彩槽位支持平滑渐变过渡动画，支持 **跟随系统 / 浅色 / 深色** 切换、微光氛围径向渐变背景及 Android 13+ **Material You 主题单色桌面图标（Monochrome Adaptive Icon）**；
-  - 保留网页版快捷长度档位（`16` / `20` / `24`，PIN 模式自动切 `6` 位）的同时，提供 **4–64 位自定义滑块**、密码字母与数字及符号主题色语法高亮、一键遮罩开关；
+  - 提供快捷长度档位（常规模式 `12` / `16` / `20` / `24` / `32`，PIN 模式 `4` / `6` / `8` / `12`；从长度大于 8 切换到 PIN 时自动改为 `6` 位）及 **4–64 位自定义滑块**、密码字母与数字及符号主题色语法高亮、一键遮罩开关；
   - 完整支持 **简体中文 / English** 双语资源及 Android 13+ 应用内独立语言设置（`localeConfig`）。
 - **多层 Android 系统安全加固**：
   - **内核级零网络隔离**：`AndroidManifest.xml` 不声明 `INTERNET` 权限，Linux 内核强制阻断任何套接字联网可能；

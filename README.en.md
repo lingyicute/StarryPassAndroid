@@ -75,7 +75,7 @@ The web repository's test files are included unchanged in `app/src/test/resource
 - **Native Material You (Material 3) dynamic colour with smooth transitions**:
   - Android 12+ uses **Monet wallpaper colours** by default (`dynamicLightColorScheme` / `dynamicDarkColorScheme`). Android 8 – 11, or with dynamic colour turned off, fall back to the Starry Blue M3 palette (`#415F91` / `#AAC7FF`).
   - All colour slots animate smoothly between schemes. You can follow the system or force light / dark, and the app has an ambient radial-gradient background and an Android 13+ **monochrome adaptive icon** for themed launchers.
-  - Quick length presets (`16` / `20` / `24`, PIN mode switches to `6`) are kept from the web version, plus a **custom 4–64 character slider**, syntax-highlighted letters, digits and symbols, and a one-tap mask toggle.
+  - Quick length presets (`12` / `16` / `20` / `24` / `32`, or `4` / `6` / `8` / `12` in PIN mode, where switching to PIN from a length above 8 picks `6`) plus a **custom 4–64 character slider**, syntax-highlighted letters, digits and symbols, and a one-tap mask toggle.
   - Full **Simplified Chinese / English** resources and Android 13+ per-app language settings (`localeConfig`).
 - **Layered Android system hardening**:
   - **Kernel-enforced zero networking**: `AndroidManifest.xml` does not declare `INTERNET`, so the Linux kernel blocks any socket access.
