@@ -40,6 +40,10 @@ class SecureClipboardManager(context: Context) {
     // They tell us the user copied something else even when the content cannot be read.
     private var replacedByOther = false
 
+    // Declared before the listener is registered in init: properties initialise in source order.
+    private val _remainingSeconds = MutableStateFlow(0)
+    val remainingSeconds: StateFlow<Int> = _remainingSeconds.asStateFlow()
+
     private val clipChangedListener = ClipboardManager.OnPrimaryClipChangedListener {
         if (ownChangesPending > 0) {
             ownChangesPending--
@@ -64,9 +68,6 @@ class SecureClipboardManager(context: Context) {
     init {
         clipboard.addPrimaryClipChangedListener(clipChangedListener)
     }
-
-    private val _remainingSeconds = MutableStateFlow(0)
-    val remainingSeconds: StateFlow<Int> = _remainingSeconds.asStateFlow()
 
     /**
      * Copies [secret] marked as sensitive (`ClipDescription.EXTRA_IS_SENSITIVE`) so Android 13+
