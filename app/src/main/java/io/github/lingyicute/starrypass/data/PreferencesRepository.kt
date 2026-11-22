@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -150,7 +151,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             updatedAtEpochMs = System.currentTimeMillis()
         )
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
+            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true).toMutableList()
             val idIdx = current.indexOfFirst { it.id == normalized.id }
             val codeIdx = current.indexOfFirst { it.code == normalized.code }
             // Quick policy save always targets the site code; full editor keeps its own entry and replaces on rename.
@@ -181,7 +182,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (cleanId.isEmpty()) return PresetRotationResult.NotFound
         var result: PresetRotationResult = PresetRotationResult.NotFound
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON]).toMutableList()
+            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true).toMutableList()
             val idx = current.indexOfFirst { it.id == cleanId }
             if (idx >= 0) {
                 val item = current[idx]
@@ -205,7 +206,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val cleanId = Spv2Spec.ecmaTrim(presetId)
         if (cleanId.isEmpty()) return
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON])
+            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true)
                 .filterNot { it.id == cleanId }
             prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
         }
@@ -308,21 +309,41 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         normalizeDomain(raw).ifEmpty { Spv2Spec.ecmaTrim(raw) }
 
     /**
-     * Decodes entries one by one: a single unreadable preset must not hide the others, nor make
-     * the next save overwrite the whole stored list with only the new entry.
+     * Reads salvageable entries independently, but mutations require a complete decode.
+     * Damaged or ambiguous records may contain irreplaceable rotation counters: never erase
+     * them by re-serializing only the successfully decoded subset.
      */
-    private fun decodePresets(raw: String?): List<SitePreset> {
-        if (raw.isNullOrBlank()) return emptyList()
-        val array = runCatching { json.parseToJsonElement(raw) as? JsonArray }.getOrNull()
-            ?: return emptyList()
+    private fun decodePresets(raw: String?, requireComplete: Boolean = false): List<SitePreset> {
+        if (raw == null) return emptyList()
+        fun rejectLossyWrite() {
+            if (requireComplete) {
+                throw IOException("Stored presets are damaged; refusing a lossy update")
+            }
+        }
+        val array = try {
+            json.parseToJsonElement(raw) as? JsonArray
+        } catch (_: SerializationException) {
+            null
+        } ?: run {
+            rejectLossyWrite()
+            return emptyList()
+        }
         val seenIds = HashSet<String>()
         val seenCodes = HashSet<String>()
         return array.mapNotNull { element ->
-            val decoded = runCatching {
+            val decoded = try {
                 json.decodeFromJsonElement(SitePreset.serializer(), element)
-            }.getOrNull() ?: return@mapNotNull null
+            } catch (_: SerializationException) {
+                null
+            } ?: run {
+                rejectLossyWrite()
+                return@mapNotNull null
+            }
             val cleanCode = Spv2Spec.ecmaTrim(decoded.code)
-            if (cleanCode.isEmpty()) return@mapNotNull null
+            if (cleanCode.isEmpty()) {
+                rejectLossyWrite()
+                return@mapNotNull null
+            }
             // Deserialization runs SitePreset's random default when an old entry has no id.
             // Treat an absent id like a blank one so subsequent edits can find the same entry.
             val storedId = if (element is JsonObject && "id" in element) decoded.id else ""
@@ -330,7 +351,10 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 UUID.nameUUIDFromBytes(cleanCode.toByteArray(Charsets.UTF_8)).toString()
             }
             // Check both before recording either, so a rejected entry cannot reserve its id.
-            if (cleanId in seenIds || cleanCode in seenCodes) return@mapNotNull null
+            if (cleanId in seenIds || cleanCode in seenCodes) {
+                rejectLossyWrite()
+                return@mapNotNull null
+            }
             seenIds.add(cleanId)
             seenCodes.add(cleanCode)
             decoded.copy(

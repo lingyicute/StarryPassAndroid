@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -171,9 +172,14 @@ class PreferencesRepositoryTest {
 
         assertEquals(listOf("alpha"), repo.presetsFlow.first().map { it.code })
 
-        repo.upsertPreset(SitePreset(code = "gamma"))
-
-        assertEquals(setOf("alpha", "gamma"), repo.presetsFlow.first().map { it.code }.toSet())
+        val original = dataStore.data.first()[stringPreferencesKey("site_presets_json")]
+        try {
+            repo.upsertPreset(SitePreset(code = "gamma"))
+            fail("Damaged records must not be erased by an unrelated save")
+        } catch (_: IOException) {
+            assertEquals(original, dataStore.data.first()[stringPreferencesKey("site_presets_json")])
+        }
+        assertEquals(listOf("alpha"), repo.presetsFlow.first().map { it.code })
     }
 
     @Test
