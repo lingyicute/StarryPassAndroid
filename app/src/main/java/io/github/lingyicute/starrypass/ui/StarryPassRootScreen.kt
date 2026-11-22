@@ -133,23 +133,28 @@ fun StarryPassRootScreen(
             .fillMaxSize()
             .background(colorScheme.background)
             .drawWithCache {
-                val primaryCenter = Offset(size.width * 0.92f, size.height * 0.06f)
-                val primaryRadius = size.maxDimension * 0.45f
-                val primaryBrush = Brush.radialGradient(
-                    colors = listOf(blobPrimary, Color.Transparent),
-                    center = primaryCenter,
-                    radius = primaryRadius
-                )
-                val tertiaryCenter = Offset(size.width * 0.08f, size.height * 0.92f)
-                val tertiaryRadius = size.maxDimension * 0.38f
-                val tertiaryBrush = Brush.radialGradient(
-                    colors = listOf(blobTertiary, Color.Transparent),
-                    center = tertiaryCenter,
-                    radius = tertiaryRadius
-                )
-                onDrawBehind {
-                    drawCircle(brush = primaryBrush, radius = primaryRadius, center = primaryCenter)
-                    drawCircle(brush = tertiaryBrush, radius = tertiaryRadius, center = tertiaryCenter)
+                val maxDim = size.maxDimension
+                if (maxDim <= 0f) {
+                    onDrawBehind {}
+                } else {
+                    val primaryCenter = Offset(size.width * 0.92f, size.height * 0.06f)
+                    val primaryRadius = maxDim * 0.45f
+                    val primaryBrush = Brush.radialGradient(
+                        colors = listOf(blobPrimary, Color.Transparent),
+                        center = primaryCenter,
+                        radius = primaryRadius
+                    )
+                    val tertiaryCenter = Offset(size.width * 0.08f, size.height * 0.92f)
+                    val tertiaryRadius = maxDim * 0.38f
+                    val tertiaryBrush = Brush.radialGradient(
+                        colors = listOf(blobTertiary, Color.Transparent),
+                        center = tertiaryCenter,
+                        radius = tertiaryRadius
+                    )
+                    onDrawBehind {
+                        drawCircle(brush = primaryBrush, radius = primaryRadius, center = primaryCenter)
+                        drawCircle(brush = tertiaryBrush, radius = tertiaryRadius, center = tertiaryCenter)
+                    }
                 }
             }
     ) {
