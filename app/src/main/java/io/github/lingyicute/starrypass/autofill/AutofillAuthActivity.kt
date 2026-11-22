@@ -366,7 +366,10 @@ class AutofillAuthActivity : FragmentActivity() {
             ) {
                 val colorScheme = MaterialTheme.colorScheme
                 val codeReady = Spv2Spec.ecmaTrim(code).isNotEmpty()
-                val canProceed = !busy && codeReady && (master.isNotEmpty() || bioEnrolled)
+                val parsedCounter = counterText.toIntOrNull()
+                val isCounterValid = parsedCounter != null &&
+                    parsedCounter in Spv2Spec.MIN_COUNTER..Spv2Spec.MAX_COUNTER
+                val canProceed = !busy && codeReady && isCounterValid && (master.isNotEmpty() || bioEnrolled)
 
                 Box(
                     modifier = Modifier
@@ -758,6 +761,7 @@ class AutofillAuthActivity : FragmentActivity() {
                                                             }
                                                         },
                                                         singleLine = true,
+                                                        isError = counterText.isNotEmpty() && !isCounterValid,
                                                         shape = RoundedCornerShape(12.dp),
                                                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                                                             textAlign = TextAlign.Center,
