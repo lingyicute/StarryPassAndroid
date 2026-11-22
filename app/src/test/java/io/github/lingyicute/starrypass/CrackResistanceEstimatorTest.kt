@@ -117,6 +117,38 @@ class CrackResistanceEstimatorTest {
     }
 
     @Test
+    fun `decorated and repeated inputs match the upstream web estimator`() {
+        // Decoration before the root (2026!password) and an apostrophe after it.
+        for (master in listOf("2026!password", "password'")) {
+            val estimate = CrackResistanceEstimator.estimate(
+                master, "example", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+            )
+            assertEquals(master, StrengthReason.WEAK_COMMON_ROOT, estimate.reason)
+            assertEquals(master, 18, estimate.bits)
+        }
+
+        // A repeated date is still a date; a repeated unit is scored once plus its repeat count.
+        val repeatedDate = CrackResistanceEstimator.estimate(
+            "1999081519990815", "bank", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+        )
+        assertEquals(StrengthReason.WEAK_PURE_DATE, repeatedDate.reason)
+        assertEquals(15, repeatedDate.bits)
+
+        val repeatedUnit = CrackResistanceEstimator.estimate(
+            "ab".repeat(16), "example", Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+        )
+        assertEquals(StrengthReason.WEAK_SHORT, repeatedUnit.reason)
+        assertEquals(10, repeatedUnit.bits)
+
+        val repeatedPhrase = CrackResistanceEstimator.estimate(
+            "correct horse battery staple ".repeat(2).trimEnd(), "example",
+            Spv2Tier.STANDARD, Spv2Mode.FULL, 16
+        )
+        assertEquals(StrengthReason.VERY_STRONG, repeatedPhrase.reason)
+        assertEquals(100, repeatedPhrase.bits)
+    }
+
+    @Test
     fun `a one character emoji code is not counted as contained in the master`() {
         val estimate = CrackResistanceEstimator.estimate(
             "Tr0ub4dor&3-xyz!Qw\uD83E\uDD84", "\uD83E\uDD84", Spv2Tier.STANDARD, Spv2Mode.FULL, 16

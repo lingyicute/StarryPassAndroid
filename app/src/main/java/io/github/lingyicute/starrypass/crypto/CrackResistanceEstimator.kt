@@ -10,7 +10,6 @@ package io.github.lingyicute.starrypass.crypto
 import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.ln
 import kotlin.math.log2
 import kotlin.math.roundToInt
 
@@ -59,9 +58,20 @@ object CrackResistanceEstimator {
         "starrypass", "huami", "flowerpassword"
     )
 
+    private val MAX_WEAK_ROOT_LEN = WEAK_ROOTS.maxOf { it.length }
+
     private val KB_ROWS = arrayOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
     private val PURE_DATE_REGEX = Regex("^(19|20)\\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\\d|3[01])$")
-    private const val TRAILING_NOISE = "0123456789!@#\$%^&*()_+-=[]{};:\"\\|,.<>/?~`"
+
+    // Decoration characters that people put around a weak root (upstream WEAK_SUFFIX_RE).
+    private const val WEAK_SUFFIX_CHARS = "0123456789!@#\$%^&*()_+-=[]{};:'\"\\|,.<>/?~`"
+
+    // Bounded window used to look for a repeated unit starting at one position.
+    private const val RUN_WINDOW = 256
+
+    private class Run(val period: Int, val length: Int)
+
+    private fun isWeakSuffixChar(ch: Char): Boolean = WEAK_SUFFIX_CHARS.indexOf(ch) >= 0
 
     private fun isKeyboardStep(cpA: Int, cpB: Int): Boolean {
         val la = cpA.toChar().lowercaseChar()
@@ -94,16 +104,110 @@ object CrackResistanceEstimator {
         return value in WEAK_ROOTS || deLeet in WEAK_ROOTS
     }
 
+    private fun utf16Units(value: String): IntArray = IntArray(value.length) { value[it].code }
+
+    /** KMP prefix function: the shortest period of `s[0..m-1]` is `m - fail[m - 1]`. */
+    private fun prefixTable(units: IntArray): IntArray {
+        val fail = IntArray(units.size)
+        var k = 0
+        for (i in 1 until units.size) {
+            while (k > 0 && units[i] != units[k]) k = fail[k - 1]
+            if (units[i] == units[k]) k++
+            fail[i] = k
+        }
+        return fail
+    }
+
+    private fun shortestPeriod(units: IntArray): Int =
+        if (units.isEmpty()) 0 else units.size - prefixTable(units)[units.size - 1]
+
+    /**
+     * Longest run from [start] that repeats a unit at least twice, searched in a bounded window
+     * and then extended. Returned only when collapsing it is clearly cheaper than scoring every
+     * character, where each further character adds at least 0.5 bits.
+     */
+    private fun repeatedRun(cps: IntArray, start: Int, limit: Int, fail: IntArray): Run? {
+        val w = minOf(limit - start, RUN_WINDOW)
+        var k = 0
+        var best = 0
+        var period = 0
+        var hit = false
+        var p = 1
+        // Cheap necessary condition first: the unit's first and last characters recur one period later.
+        while (p * 2 <= w && !hit) {
+            hit = cps[start + p] == cps[start] && cps[start + 2 * p - 1] == cps[start + p - 1]
+            p++
+        }
+        if (!hit) return null
+        for (j in 1 until w) {
+            while (k > 0 && cps[start + j] != cps[start + k]) k = fail[k - 1]
+            if (cps[start + j] == cps[start + k]) k++
+            fail[j] = k
+            val candidate = j + 1 - k
+            if (candidate * 2 <= j + 1) {
+                best = j + 1
+                period = candidate
+            }
+        }
+        if (best == 0) return null
+        while (start + best < limit && cps[start + best] == cps[start + best - period]) best++
+        return if (log2(best.toDouble() / period) < 0.5 * (best - period)) Run(period, best) else null
+    }
+
+    /** Decorations may precede a weak root too (`2026!password`): skip at most 8 of them. */
     private fun hasWeakRoot(value: String): Boolean {
-        if (isWeakRoot(value)) return true
-        var stem = value
-        // Strip before de-leeting and test every boundary, including digit-ending roots.
-        repeat(8) {
-            if (stem.isEmpty() || stem.last() !in TRAILING_NOISE) return false
-            stem = stem.dropLast(1)
-            if (isWeakRoot(stem)) return true
+        var start = 0
+        while (start <= 8 && start < value.length) {
+            if (start > 0 && !isWeakSuffixChar(value[start - 1])) return false
+            if (hasWeakRootFrom(if (start > 0) value.substring(start) else value)) return true
+            start++
         }
         return false
+    }
+
+    private fun hasWeakRootFrom(value: String): Boolean {
+        val n = value.length
+        if (n == 0) return false
+        // One KMP table answers the shortest period of any prefix in O(1); memoising by prefix
+        // length avoids exponential recursion.
+        val fail = prefixTable(utf16Units(value))
+        val seen = HashSet<Int>()
+        var prefixLimit = 0
+        while (prefixLimit < 8 && prefixLimit < n && isWeakSuffixChar(value[prefixLimit])) prefixLimit++
+
+        fun scan(startLen: Int, folded: Boolean): Boolean {
+            if (!seen.add(startLen)) return false
+            var len = startLen
+            var strip = 0
+            // Strip before de-leeting and test every boundary, including digit-ending roots
+            // (`abc123!`), and fold pure repetitions (`P@ssw0rd2026!P@ssw0rd2026!`).
+            while (len > 0) {
+                // A complete period can carry its own leading decoration; the caller already
+                // handles prefixes on the whole input.
+                val lastStart = if (folded) minOf(prefixLimit, len - 1) else 0
+                var start = maxOf(0, len - MAX_WEAK_ROOT_LEN)
+                while (start <= lastStart) {
+                    if (isWeakRoot(value.substring(start, len))) return true
+                    start++
+                }
+                val period = len - fail[len - 1]
+                if (period > 0 && period * 2 <= len) {
+                    if (scan(period, true)) return true
+                    // A weak root may itself repeat (zaq1zaq1, 000000, 121212).
+                    val maxMult = minOf(len ushr 1, MAX_WEAK_ROOT_LEN + 8 + prefixLimit)
+                    var mult = period * 2
+                    while (mult <= maxMult) {
+                        if (scan(mult, true)) return true
+                        mult += period
+                    }
+                }
+                if (strip >= 8 || !isWeakSuffixChar(value[len - 1])) return false
+                strip++
+                len--
+            }
+            return false
+        }
+        return scan(n, false)
     }
 
     fun estimate(
@@ -139,7 +243,10 @@ object CrackResistanceEstimator {
                 reason = StrengthReason.WEAK_CONTAINS_CODE
             )
         }
-        if (PURE_DATE_REGEX.matches(m)) {
+        // Only a date prefix can form a repeated date; skip the extra KMP table otherwise.
+        if (PURE_DATE_REGEX.matches(m) ||
+            (m.length >= 16 && PURE_DATE_REGEX.matches(m.substring(0, 8)) && shortestPeriod(utf16Units(m)) == 8)
+        ) {
             return StrengthEstimate(
                 level = 1,
                 bits = minOf(15.0, outBits).roundToInt(),
@@ -173,11 +280,37 @@ object CrackResistanceEstimator {
             (if (hasUpper) 26 else 0) +
             (if (hasDigit) 10 else 0) +
             (if (hasSym) 33 else 0)
-        val asciiBits = if (asciiPool > 0) ln(asciiPool.toDouble()) / ln(2.0) else 0.0
+        val asciiBits = if (asciiPool > 0) log2(asciiPool.toDouble()) else 0.0
+
+        // A string built from a short repeating unit (aaaa…, abcabc…) counts one unit plus the
+        // information in the repeat count; otherwise a very long repeat would add up to "strong".
+        val n = cps.size
+        var unitLen = shortestPeriod(cps)
+        if (unitLen * 2 > n) unitLen = n
+        // A repeat inside a longer string (abab…abX) is collapsed the same way; nested repeats
+        // inside a collapsed unit are folded too, via a stack of (unit end, run end) boundaries.
+        val skipUnitEnds = ArrayList<Int>()
+        val skipRunEnds = ArrayList<Int>()
+        var repeatBits = 0.0
+        if (unitLen < n) {
+            skipUnitEnds.add(unitLen)
+            skipRunEnds.add(n)
+            repeatBits += log2(n.toDouble() / unitLen)
+        }
+        val runFail = IntArray(RUN_WINDOW)
 
         var bits = 0.0
         val seen = HashMap<Int, Int>()
-        for (i in cps.indices) {
+        var i = 0
+        while (i < n) {
+            var limit = if (skipUnitEnds.isEmpty()) n else skipUnitEnds[skipUnitEnds.size - 1]
+            while (true) {
+                val run = repeatedRun(cps, i, limit, runFail) ?: break
+                limit = i + run.period
+                skipUnitEnds.add(limit)
+                skipRunEnds.add(i + run.length)
+                repeatBits += log2(run.length.toDouble() / run.period)
+            }
             val cp = cps[i]
             val baseBits = when {
                 cp in 32..126 -> asciiBits
@@ -194,7 +327,14 @@ object CrackResistanceEstimator {
                 else -> baseBits * 0.35
             }
             seen[cp] = count + 1
+            // Leaving a collapsed unit: skip the remaining repeats of it.
+            while (skipUnitEnds.isNotEmpty() && i + 1 == skipUnitEnds[skipUnitEnds.size - 1]) {
+                skipUnitEnds.removeAt(skipUnitEnds.size - 1)
+                i = skipRunEnds.removeAt(skipRunEnds.size - 1) - 1
+            }
+            i++
         }
+        bits += repeatBits
 
         if (tier == Spv2Tier.PARANOID) {
             bits += 3.0
