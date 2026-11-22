@@ -178,7 +178,6 @@ class SecureClipboardManager(context: Context) {
     private fun resetTrackedCopy() {
         Spv2Spec.zeroize(lastCopiedSha256)
         lastCopiedSha256 = null
-        ownChangesPending = 0
         replacedByOther = false
     }
 
