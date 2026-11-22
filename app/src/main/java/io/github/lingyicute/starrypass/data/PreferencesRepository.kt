@@ -525,7 +525,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             // A bracket exposed only by stripping the prefix never went through the IPv6 check above.
             if (s.startsWith("[") && !bracketValidated) return ""
             if (s == "www." || s.startsWith("www..")) return ""
-            s = s.trimEnd('.')
+            if (s.endsWith('.')) s = s.dropLast(1)
             if (s.isEmpty() || s == "*" || (!s.startsWith("[") && s.contains(".."))) return ""
             if (s.any { it <= ' ' || Spv2Spec.ecmaTrim(it.toString()).isEmpty() }) return ""
             if (s.any { it.code >= 0x80 }) {

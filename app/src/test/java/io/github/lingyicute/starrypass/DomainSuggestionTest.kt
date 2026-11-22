@@ -377,4 +377,11 @@ class DomainSuggestionTest {
         assertEquals("[::1]", PreferencesRepository.normalizeDomain("[::1]:8080"))
         assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("http://[2001:db8::1]/x"))
     }
+
+    @Test
+    fun `rejects multiple trailing dots while allowing a single FQDN root dot`() {
+        assertEquals("example.com", PreferencesRepository.normalizeDomain("example.com."))
+        assertEquals("", PreferencesRepository.normalizeDomain("example.com.."))
+        assertEquals("", PreferencesRepository.normalizeDomain("https://example.com.../login"))
+    }
 }
