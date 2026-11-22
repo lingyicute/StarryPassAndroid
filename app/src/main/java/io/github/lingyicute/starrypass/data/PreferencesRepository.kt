@@ -211,12 +211,6 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun clearAllPresets() {
-        dataStore.edit { prefs ->
-            prefs.remove(Keys.SITE_PRESETS_JSON)
-        }
-    }
-
     /**
      * Matches an incoming Autofill web domain or Android package name against saved presets.
      */
