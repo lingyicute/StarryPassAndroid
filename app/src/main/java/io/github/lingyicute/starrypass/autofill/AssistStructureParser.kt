@@ -317,6 +317,30 @@ internal object AssistStructureParser {
         "password"
     )
 
+    private val ANDROID_PASSWORD_HINT_TOKENS = setOf(
+        "password",
+        "newpassword",
+        "current-password",
+        "new-password"
+    )
+
+    private val ANDROID_NON_PASSWORD_HINT_TOKENS = setOf(
+        "username",
+        "newusername",
+        "emailaddress",
+        "email",
+        "phone",
+        "phonenumber",
+        "name",
+        "personname",
+        "given-name",
+        "family-name",
+        "url",
+        "one-time-code",
+        "smsotpcode",
+        "2faappotpcode"
+    )
+
     /** HTML card autofill tokens can appear alongside `type=password` on masked CVV fields. */
     internal fun hasCreditCardHtmlAutocomplete(attributes: Sequence<Pair<String?, String?>>): Boolean =
         attributes.any { (rawName, rawValue) ->
@@ -324,6 +348,29 @@ internal object AssistStructureParser {
                 rawValue?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
                     ?.split(WHITESPACE_RUN)?.any { it.startsWith("cc-") || it.startsWith("creditcard") } == true
         }
+
+    internal fun classifyAutofillHints(hints: Array<out String?>?): Boolean? {
+        if (hints.isNullOrEmpty()) return null
+        val tokens = hints.asSequence()
+            .mapNotNull { it?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) }
+            .flatMap { it.split(WHITESPACE_RUN).asSequence() }
+            .filter { it.isNotEmpty() }
+            .toList()
+        if (tokens.isEmpty()) return null
+        if (tokens.any { it.startsWith("creditcard") || it.startsWith("cc-") }) return false
+        if (tokens.any { token ->
+                token in ANDROID_NON_PASSWORD_HINT_TOKENS ||
+                    token.contains("username") ||
+                    token.contains("email") ||
+                    token.contains("phone") ||
+                    token.contains("otp")
+            }
+        ) {
+            return false
+        }
+        if (tokens.any { it in ANDROID_PASSWORD_HINT_TOKENS }) return true
+        return null
+    }
 
     internal fun classifyHtmlPasswordInput(attributes: Sequence<Pair<String?, String?>>): Boolean? {
         var typeSeen = false
@@ -374,36 +421,8 @@ internal object AssistStructureParser {
             return false
         }
 
-        // 1. Explicit Android autofillHints: card fields win even if a conflicting password hint exists.
-        val hints = node.autofillHints
-        if (!hints.isNullOrEmpty()) {
-            val cleanHints = hints.mapNotNull {
-                it?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)?.takeIf(String::isNotEmpty)
-            }
-            if (cleanHints.any { it.startsWith("creditcard") || it.startsWith("cc-") }) return false
-            if (cleanHints.any { hint ->
-                    hint == View.AUTOFILL_HINT_PASSWORD.lowercase(Locale.ROOT) ||
-                        hint.contains("password") ||
-                        hint == "newpassword"
-                }
-            ) {
-                return true
-            }
-            if (cleanHints.any { hint ->
-                    hint == View.AUTOFILL_HINT_USERNAME.lowercase(Locale.ROOT) ||
-                        hint.contains("username") ||
-                        hint == View.AUTOFILL_HINT_EMAIL_ADDRESS.lowercase(Locale.ROOT) ||
-                        hint.contains("email") ||
-                        hint == View.AUTOFILL_HINT_PHONE.lowercase(Locale.ROOT) ||
-                        hint.contains("phone") ||
-                        hint == View.AUTOFILL_HINT_NAME.lowercase(Locale.ROOT) ||
-                        hint == "one-time-code" ||
-                        hint.contains("otp")
-                }
-            ) {
-                return false
-            }
-        }
+        // 1. Explicit Android autofillHints: card and non-password hints win over password hints.
+        classifyAutofillHints(node.autofillHints)?.let { return it }
 
         // 2. HTML <input> attributes in browsers / WebViews
         if (htmlAttrs != null) {

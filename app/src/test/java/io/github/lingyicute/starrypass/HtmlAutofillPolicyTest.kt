@@ -92,4 +92,19 @@ class HtmlAutofillPolicyTest {
         assertNull(classify(sequenceOf("type" to "text", "type" to "password")))
         assertEquals(true, classify(sequenceOf("type" to "password", "type" to "text")))
     }
+
+    @Test
+    fun `autofillHints classification uses exact password tokens and prioritizes non-password hints`() {
+        val classify = AssistStructureParser::classifyAutofillHints
+        assertEquals(false, classify(arrayOf("section-checkout cc-csc")))
+        assertEquals(false, classify(arrayOf("section-password username")))
+        assertEquals(false, classify(arrayOf("section-password", "username")))
+        assertEquals(false, classify(arrayOf("one-time-code", "password")))
+        assertEquals(false, classify(arrayOf("password_recovery_email")))
+        assertNull(classify(arrayOf("section-password")))
+        assertEquals(true, classify(arrayOf("section-login current-password")))
+        assertEquals(true, classify(arrayOf("newPassword")))
+        assertEquals(true, classify(arrayOf("password")))
+        assertNull(classify(emptyArray()))
+    }
 }
