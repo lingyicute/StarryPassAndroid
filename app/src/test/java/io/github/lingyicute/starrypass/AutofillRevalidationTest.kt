@@ -23,8 +23,7 @@ class AutofillRevalidationTest {
         livePackageName = livePackage,
         expectedWebDomain = expectedDomain,
         expectedPackageName = expectedPackage,
-        selfPackageName = selfPackage,
-        fallbackTargets = listOf("stale-password")
+        selfPackageName = selfPackage
     )
 
     @Test
@@ -51,8 +50,8 @@ class AutofillRevalidationTest {
     }
 
     @Test
-    fun `absent live structures retain the service fallback for compatibility`() {
-        assertEquals(listOf("stale-password"), targets(hasLiveStructure = false))
+    fun `absent live structures cannot authorize stale fields`() {
+        assertEquals(emptyList<String>(), targets(hasLiveStructure = false))
     }
 
     @Test
@@ -71,5 +70,11 @@ class AutofillRevalidationTest {
     fun `successful parsing still rejects origin or package changes`() {
         assertEquals(emptyList<String>(), targets(liveDomain = "other.example"))
         assertEquals(emptyList<String>(), targets(livePackage = "com.other.app"))
+    }
+    @Test
+    fun `missing package identity cannot authorize either live or stale fields`() {
+        assertEquals(emptyList<String>(), targets(livePackage = null, expectedPackage = null))
+        assertEquals(emptyList<String>(), targets(hasLiveStructure = false, expectedPackage = null))
+        assertEquals(emptyList<String>(), targets(livePackage = "", expectedPackage = ""))
     }
 }

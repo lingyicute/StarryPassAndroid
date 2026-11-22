@@ -76,7 +76,7 @@ class StarryPassAutofillService : AutofillService() {
         val targetIds = parsed.resolveTargetIds(isManualRequest)
 
         // Never offer autofill inside StarryPass itself or when no targetable input field exists
-        if (parsed.packageName == packageName || targetIds.isEmpty()) {
+        if (parsed.packageName.isNullOrBlank() || parsed.packageName == packageName || targetIds.isEmpty()) {
             callback.onSuccess(null)
             return
         }
@@ -107,10 +107,6 @@ class StarryPassAutofillService : AutofillService() {
             }
 
             val authIntent = Intent(this@StarryPassAutofillService, AutofillAuthActivity::class.java).apply {
-                putParcelableArrayListExtra(
-                    AutofillAuthActivity.EXTRA_PASSWORD_IDS,
-                    ArrayList(targetIds)
-                )
                 putExtra(AutofillAuthActivity.EXTRA_MANUAL_REQUEST, isManualRequest)
                 putExtra(AutofillAuthActivity.EXTRA_EXPECTED_DOMAIN, parsed.webDomain)
                 putExtra(AutofillAuthActivity.EXTRA_EXPECTED_PACKAGE, parsed.packageName)

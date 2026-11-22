@@ -176,15 +176,12 @@ internal object AssistStructureParser {
         livePackageName: String?,
         expectedWebDomain: String?,
         expectedPackageName: String?,
-        selfPackageName: String,
-        fallbackTargets: List<T>
+        selfPackageName: String
     ): List<T> {
-        if (liveParseFailed) return emptyList()
-        if (!hasLiveStructure) {
-            if (expectedPackageName == selfPackageName) return emptyList()
-            return fallbackTargets
+        if (!hasLiveStructure || liveParseFailed || expectedPackageName.isNullOrBlank()) {
+            return emptyList()
         }
-        if (livePackageName == selfPackageName) return emptyList()
+        if (expectedPackageName == selfPackageName) return emptyList()
         if (livePackageName != expectedPackageName || liveWebDomain != expectedWebDomain) {
             return emptyList()
         }

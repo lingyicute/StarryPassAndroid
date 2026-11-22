@@ -135,7 +135,6 @@ private val AUTOFILL_DEFAULT_QUICK_LENGTHS = listOf(12, 16, 20, 24, 32)
 class AutofillAuthActivity : FragmentActivity() {
 
     companion object {
-        const val EXTRA_PASSWORD_IDS = "extra_password_ids"
         const val EXTRA_MANUAL_REQUEST = "extra_manual_request"
         const val EXTRA_EXPECTED_DOMAIN = "extra_expected_domain"
         const val EXTRA_EXPECTED_PACKAGE = "extra_expected_package"
@@ -152,18 +151,16 @@ class AutofillAuthActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val fallbackIds: List<AutofillId> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableArrayListExtra(EXTRA_PASSWORD_IDS, AutofillId::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableArrayListExtra(EXTRA_PASSWORD_IDS)
-        }.orEmpty()
-
-        val liveStructure: AssistStructure? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(AutofillManager.EXTRA_ASSIST_STRUCTURE, AssistStructure::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(AutofillManager.EXTRA_ASSIST_STRUCTURE)
+        val liveStructure: AssistStructure? = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(AutofillManager.EXTRA_ASSIST_STRUCTURE, AssistStructure::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(AutofillManager.EXTRA_ASSIST_STRUCTURE)
+            }
+        } catch (_: RuntimeException) {
+            cancelAutofill()
+            return
         }
 
         val isManualRequest = intent.getBooleanExtra(EXTRA_MANUAL_REQUEST, false)
@@ -189,8 +186,7 @@ class AutofillAuthActivity : FragmentActivity() {
             livePackageName = liveParsed?.packageName,
             expectedWebDomain = expectedDomain,
             expectedPackageName = expectedPackage,
-            selfPackageName = packageName,
-            fallbackTargets = fallbackIds
+            selfPackageName = packageName
         )
 
         if (targetIds.isEmpty()) {

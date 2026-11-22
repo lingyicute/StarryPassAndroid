@@ -269,7 +269,7 @@ class DomainSuggestionTest {
         val selfPkg = "io.github.lingyicute.starrypass"
         assertEquals(
             listOf("live-pw"),
-            AssistStructureParser.resolveAuthenticatedTargets(
+            AssistStructureParser.resolveAuthenticatedTargets<String>(
                 hasLiveStructure = true,
                 liveParseFailed = false,
                 liveTargets = listOf("live-pw"),
@@ -277,14 +277,13 @@ class DomainSuggestionTest {
                 livePackageName = "com.android.chrome",
                 expectedWebDomain = "github.com",
                 expectedPackageName = "com.android.chrome",
-                selfPackageName = selfPkg,
-                fallbackTargets = listOf("old-pw")
+                selfPackageName = selfPkg
             )
         )
         // Cross-origin redirect between onFillRequest and authentication must abort.
         assertEquals(
             emptyList<String>(),
-            AssistStructureParser.resolveAuthenticatedTargets(
+            AssistStructureParser.resolveAuthenticatedTargets<String>(
                 hasLiveStructure = true,
                 liveParseFailed = false,
                 liveTargets = listOf("evil-pw"),
@@ -292,14 +291,13 @@ class DomainSuggestionTest {
                 livePackageName = "com.android.chrome",
                 expectedWebDomain = "github.com",
                 expectedPackageName = "com.android.chrome",
-                selfPackageName = selfPkg,
-                fallbackTargets = listOf("old-pw")
+                selfPackageName = selfPkg
             )
         )
         // A valid live structure with zero eligible targets must not fall back to stale IDs.
         assertEquals(
             emptyList<String>(),
-            AssistStructureParser.resolveAuthenticatedTargets(
+            AssistStructureParser.resolveAuthenticatedTargets<String>(
                 hasLiveStructure = true,
                 liveParseFailed = false,
                 liveTargets = emptyList(),
@@ -307,14 +305,13 @@ class DomainSuggestionTest {
                 livePackageName = "com.android.chrome",
                 expectedWebDomain = "github.com",
                 expectedPackageName = "com.android.chrome",
-                selfPackageName = selfPkg,
-                fallbackTargets = listOf("old-pw")
+                selfPackageName = selfPkg
             )
         )
-        // Missing live structure falls back to service-provided IDs unless targeting StarryPass itself.
+        // Missing live structure cannot establish that the target is still safe.
         assertEquals(
-            listOf("old-pw"),
-            AssistStructureParser.resolveAuthenticatedTargets(
+            emptyList<String>(),
+            AssistStructureParser.resolveAuthenticatedTargets<String>(
                 hasLiveStructure = false,
                 liveParseFailed = false,
                 liveTargets = emptyList(),
@@ -322,8 +319,7 @@ class DomainSuggestionTest {
                 livePackageName = null,
                 expectedWebDomain = "github.com",
                 expectedPackageName = "com.android.chrome",
-                selfPackageName = selfPkg,
-                fallbackTargets = listOf("old-pw")
+                selfPackageName = selfPkg
             )
         )
     }
