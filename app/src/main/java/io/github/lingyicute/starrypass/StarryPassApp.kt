@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicReference
 
 class StarryPassApp : Application() {
 
@@ -40,8 +41,7 @@ class StarryPassApp : Application() {
 
     val sessionWipes = SessionWipeSignal()
 
-    @Volatile
-    private var cachedWipeOnBackground: Boolean? = null
+    private val cachedWipeOnBackground = AtomicReference<Boolean?>(null)
 
     override fun onCreate() {
         super.onCreate()
@@ -57,7 +57,7 @@ class StarryPassApp : Application() {
 
         appScope.launch {
             preferencesRepository.settingsFlow.collect { settings ->
-                cachedWipeOnBackground = settings.wipeOnBackground
+                cachedWipeOnBackground.set(settings.wipeOnBackground)
             }
         }
 
@@ -65,7 +65,7 @@ class StarryPassApp : Application() {
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             object : DefaultLifecycleObserver {
                 override fun onStop(owner: LifecycleOwner) {
-                    val knownSetting = cachedWipeOnBackground
+                    val knownSetting = cachedWipeOnBackground.get()
                     if (knownSetting == true) {
                         sessionWipes.invalidate()
                         biometricVault.cancelPendingAuthentication()
@@ -75,7 +75,7 @@ class StarryPassApp : Application() {
                     } else if (knownSetting == null) {
                         appScope.launch {
                             val settings = preferencesRepository.settingsFlow.first()
-                            cachedWipeOnBackground = settings.wipeOnBackground
+                            cachedWipeOnBackground.compareAndSet(null, settings.wipeOnBackground)
                             if (settings.wipeOnBackground) {
                                 // Invalidate UI and biometric callbacks before waiting for a possibly
                                 // non-interruptible Argon2 operation holding the engine mutex.
