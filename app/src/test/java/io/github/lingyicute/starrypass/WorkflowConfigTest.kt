@@ -23,7 +23,7 @@ class WorkflowConfigTest {
         assertTrue(workflow.contains("contents: write"))
         assertTrue(Regex("uses: actions/checkout@[0-9a-f]{40}").containsMatchIn(workflow))
         assertFalse(workflow.contains("fetch-depth: 0"))
-        assertTrue(workflow.contains("bash gradlew --no-daemon testDebugUnitTest assembleRelease"))
+        assertTrue(workflow.contains("bash gradlew --no-daemon testDebugUnitTest assembleRelease lintDebug"))
         assertTrue(workflow.contains("path: app/build/outputs/apk/release/app-release-unsigned.apk"))
         assertTrue(workflow.contains("""git tag --force nightly "${'$'}GITHUB_SHA""""))
         assertTrue(workflow.contains("git push --force origin refs/tags/nightly"))
