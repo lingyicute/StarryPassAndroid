@@ -105,7 +105,7 @@ internal class GeneratorDerivationCoordinator(
             val ready = next.master.isNotEmpty() && Spv2Spec.ecmaTrim(next.code).isNotEmpty()
             val strength = when {
                 !ready -> StrengthEstimate(0, 0, StrengthReason.EMPTY)
-                // Counter and most length changes cannot alter the estimate; skip the UI-thread rescoring.
+                // Counter changes cannot alter the estimate; skip the UI-thread rescoring.
                 previous.strength.reason != StrengthReason.EMPTY && sameStrengthInputs(previous, next) ->
                     previous.strength
                 else ->
