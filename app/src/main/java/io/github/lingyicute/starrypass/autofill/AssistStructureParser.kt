@@ -108,7 +108,7 @@ internal object AssistStructureParser {
         var passwordDomain: String? = null
 
         for (i in 0 until structure.windowNodeCount) {
-            val root = structure.getWindowNodeAt(i).rootViewNode
+            val root = structure.getWindowNodeAt(i).rootViewNode ?: continue
             traverseNode(
                 node = root,
                 inheritedOrigin = NodeOrigin.Native,
@@ -265,8 +265,9 @@ internal object AssistStructureParser {
         }
 
         for (c in 0 until node.childCount) {
+            val child = node.getChildAt(c) ?: continue
             traverseNode(
-                node = node.getChildAt(c),
+                node = child,
                 inheritedOrigin = activeOrigin,
                 onDomain = onDomain,
                 onFocusedEditable = onFocusedEditable,
