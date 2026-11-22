@@ -89,14 +89,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         currentWipeGeneration = { app.sessionWipes.generation.value }
     )
 
+    // Capture before launching so a wipe between construction and collection is not missed.
+    private var observedWipe = app.sessionWipes.generation.value
+
     init {
         viewModelScope.launch {
             runCatching { engine.runSelfTest() }
             _uiState.update { it.copy(katVerified = engine.isSelfTestVerified) }
         }
 
-        // Capture before launching so a wipe between construction and collection is not missed.
-        var observedWipe = app.sessionWipes.generation.value
         viewModelScope.launch {
             app.sessionWipes.generation.collect { generation ->
                 if (generation != observedWipe) {
@@ -133,7 +134,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetAll() {
-        app.sessionWipes.invalidate()
+        observedWipe = app.sessionWipes.invalidate()
         biometricVault.cancelPendingAuthentication()
         derivation.cancel()
         _uiState.update {
