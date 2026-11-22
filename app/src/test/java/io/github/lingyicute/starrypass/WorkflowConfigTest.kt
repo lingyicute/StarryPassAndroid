@@ -55,4 +55,14 @@ class WorkflowConfigTest {
         assertTrue(actions.isNotEmpty())
         actions.forEach { assertTrue(it.value, Regex("[0-9a-f]{40}").matches(it.groupValues[1])) }
     }
+    @Test
+    fun `stale main reruns are rejected before release or tag mutation`() {
+        val workflow = File("../.github/workflows/create-release.yml").readText()
+        val guard = workflow.indexOf("git ls-remote --exit-code origin refs/heads/main")
+        assertTrue(guard >= 0)
+        assertTrue(guard < workflow.indexOf("gh release upload"))
+        assertTrue(guard < workflow.indexOf("git tag --force"))
+        assertTrue(workflow.contains("""if [[ "${'$'}latest_sha" != "${'$'}GITHUB_SHA" ]]; then"""))
+        assertTrue(workflow.contains("shell: bash"))
+    }
 }

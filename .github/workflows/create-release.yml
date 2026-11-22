@@ -59,10 +59,17 @@ jobs:
           name: app-release
           path: apk
       - name: Publish nightly
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
+          # A re-run of an older main workflow must never roll nightly back.
+          latest_sha="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          if [[ "$latest_sha" != "$GITHUB_SHA" ]]; then
+            echo "Skipping nightly publication for a stale main commit."
+            exit 0
+          fi
           notes="auto build · ${GITHUB_SHA:0:7} · ${GITHUB_REF_NAME} · unsigned APK"
           if gh release view nightly >/dev/null 2>&1; then
             # Update in place and upload the new APK before moving the tag or
