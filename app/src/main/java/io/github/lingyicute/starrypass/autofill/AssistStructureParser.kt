@@ -311,6 +311,12 @@ internal object AssistStructureParser {
         return node.autofillType == View.AUTOFILL_TYPE_TEXT
     }
 
+    private val PASSWORD_AUTOCOMPLETE_TOKENS = setOf(
+        "current-password",
+        "new-password",
+        "password"
+    )
+
     /** HTML card autofill tokens can appear alongside `type=password` on masked CVV fields. */
     internal fun hasCreditCardHtmlAutocomplete(attributes: Sequence<Pair<String?, String?>>): Boolean =
         attributes.any { (rawName, rawValue) ->
@@ -318,6 +324,49 @@ internal object AssistStructureParser {
                 rawValue?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
                     ?.split(WHITESPACE_RUN)?.any { it.startsWith("cc-") || it.startsWith("creditcard") } == true
         }
+
+    internal fun classifyHtmlPasswordInput(attributes: Sequence<Pair<String?, String?>>): Boolean? {
+        var typeSeen = false
+        var firstType: String? = null
+        var explicitPasswordAutocomplete = false
+        var explicitNonPasswordAutocomplete = false
+        var keywordNonPassword = false
+        var keywordPassword = false
+
+        for ((rawName, rawValue) in attributes) {
+            val attrName = rawName?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
+            val attrVal = rawValue?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT)
+            if (attrName == "type" && !typeSeen) {
+                typeSeen = true
+                firstType = attrVal
+            }
+            if (attrVal == null) continue
+            if (attrName == "autocomplete") {
+                val tokens = attrVal.split(WHITESPACE_RUN).filter { it.isNotEmpty() }
+                if (tokens.any { it in NON_PASSWORD_AUTOCOMPLETE_TOKENS }) {
+                    explicitNonPasswordAutocomplete = true
+                }
+                if (tokens.any { it in PASSWORD_AUTOCOMPLETE_TOKENS }) {
+                    explicitPasswordAutocomplete = true
+                }
+            }
+            if (attrName == "name" || attrName == "id" || attrName == "placeholder" || attrName == "aria-label") {
+                if (NON_PASSWORD_FIELD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
+                    keywordNonPassword = true
+                } else if (PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
+                    keywordPassword = true
+                }
+            }
+        }
+
+        if (explicitNonPasswordAutocomplete) return false
+        if (explicitPasswordAutocomplete) return true
+        if (firstType == "password") return true
+        if (firstType != null && firstType in NON_PASSWORD_HTML_TYPES) return false
+        if (keywordNonPassword) return false
+        if (keywordPassword) return true
+        return null
+    }
 
     private fun isPasswordNode(node: AssistStructure.ViewNode): Boolean {
         val htmlAttrs = node.htmlInfo?.attributes
@@ -357,34 +406,11 @@ internal object AssistStructureParser {
         }
 
         // 2. HTML <input> attributes in browsers / WebViews
-        var explicitNonPasswordHtml = false
-        var htmlKeywordMatched = false
         if (htmlAttrs != null) {
-            for (attr in htmlAttrs) {
-                val attrName = attr.first?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
-                val attrVal = attr.second?.let(Spv2Spec::ecmaTrim)?.lowercase(Locale.ROOT) ?: continue
-                if (attrName == "type") {
-                    if (attrVal == "password") return true
-                    if (attrVal in NON_PASSWORD_HTML_TYPES) explicitNonPasswordHtml = true
-                }
-                if (attrName == "autocomplete") {
-                    if (attrVal.contains("password")) return true
-                    val tokens = attrVal.split(WHITESPACE_RUN).filter { it.isNotEmpty() }
-                    if (tokens.any { it in NON_PASSWORD_AUTOCOMPLETE_TOKENS }) {
-                        explicitNonPasswordHtml = true
-                    }
-                }
-                if (attrName == "name" || attrName == "id" || attrName == "placeholder" || attrName == "aria-label") {
-                    if (NON_PASSWORD_FIELD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
-                        explicitNonPasswordHtml = true
-                    } else if (PASSWORD_KEYWORDS.any { kw -> attrVal.contains(kw) }) {
-                        htmlKeywordMatched = true
-                    }
-                }
+            classifyHtmlPasswordInput(htmlAttrs.asSequence().map { it.first to it.second })?.let {
+                return it
             }
         }
-        if (explicitNonPasswordHtml) return false
-        if (htmlKeywordMatched) return true
 
         // 3. Android InputType flags (covers hidden & visible password toggles and numeric PIN inputs)
         val inputType = node.inputType

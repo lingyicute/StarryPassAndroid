@@ -1,7 +1,9 @@
 package io.github.lingyicute.starrypass
 
 import io.github.lingyicute.starrypass.autofill.AssistStructureParser
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -77,5 +79,17 @@ class HtmlAutofillPolicyTest {
         assertFalse(card(sequenceOf("autocomplete" to "current-password")))
         assertFalse(card(sequenceOf("autocomplete" to "section-cc-csc current-password")))
         assertFalse(card(sequenceOf("aria-autocomplete" to "cc-csc")))
+    }
+
+    @Test
+    fun `html password classification respects first type and exact autocomplete tokens`() {
+        val classify = AssistStructureParser::classifyHtmlPasswordInput
+        assertEquals(false, classify(sequenceOf("type" to "password", "autocomplete" to "one-time-code")))
+        assertEquals(false, classify(sequenceOf("type" to "text", "autocomplete" to "section-password username")))
+        assertNull(classify(sequenceOf("type" to "text", "autocomplete" to "section-password")))
+        assertEquals(true, classify(sequenceOf("type" to "text", "autocomplete" to "section-login current-password")))
+        assertEquals(false, classify(sequenceOf("type" to "email", "type" to "password")))
+        assertNull(classify(sequenceOf("type" to "text", "type" to "password")))
+        assertEquals(true, classify(sequenceOf("type" to "password", "type" to "text")))
     }
 }
