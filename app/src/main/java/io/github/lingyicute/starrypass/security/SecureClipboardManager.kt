@@ -190,12 +190,15 @@ class SecureClipboardManager(context: Context) {
     }
 
     private fun wipeSystemClipboard() {
-        runCatching {
+        ownChangesPending++
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 clipboard.clearPrimaryClip()
             } else {
                 clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
             }
+        } catch (_: Throwable) {
+            ownChangesPending--
         }
     }
 }
