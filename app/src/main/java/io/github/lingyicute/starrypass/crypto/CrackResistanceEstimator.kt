@@ -11,6 +11,7 @@ import java.text.Normalizer
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ln
+import kotlin.math.log2
 import kotlin.math.roundToInt
 
 enum class StrengthReason {
@@ -118,17 +119,40 @@ object CrackResistanceEstimator {
             return StrengthEstimate(level = 0, bits = 0, reason = StrengthReason.EMPTY)
         }
 
+        // Theoretical upper bound of the output space, not an exact entropy: no verdict can
+        // claim more bits than the generated password can carry.
+        val poolSize = when (mode) {
+            Spv2Mode.PIN -> 10
+            Spv2Mode.ALNUM -> 62
+            Spv2Mode.FULL -> 77
+        }
+        val outBits = Spv2Spec.clampLength(length) * log2(poolSize.toDouble())
+
         val mLower = m.lowercase(Locale.ROOT)
         val cLower = c.lowercase(Locale.ROOT)
-        if (cLower.length >= 2 && mLower.contains(cLower)) {
-            return StrengthEstimate(level = 1, bits = 16, reason = StrengthReason.WEAK_CONTAINS_CODE)
+        // Count code points before case folding: one astral character, or an `İ` that lowercases
+        // to two code points, is still a one-character code.
+        if (c.codePointCount(0, c.length) >= 2 && mLower.contains(cLower)) {
+            return StrengthEstimate(
+                level = 1,
+                bits = minOf(16.0, outBits).roundToInt(),
+                reason = StrengthReason.WEAK_CONTAINS_CODE
+            )
         }
         if (PURE_DATE_REGEX.matches(m)) {
-            return StrengthEstimate(level = 1, bits = 15, reason = StrengthReason.WEAK_PURE_DATE)
+            return StrengthEstimate(
+                level = 1,
+                bits = minOf(15.0, outBits).roundToInt(),
+                reason = StrengthReason.WEAK_PURE_DATE
+            )
         }
 
         if (hasWeakRoot(mLower)) {
-            return StrengthEstimate(level = 1, bits = 18, reason = StrengthReason.WEAK_COMMON_ROOT)
+            return StrengthEstimate(
+                level = 1,
+                bits = minOf(18.0, outBits).roundToInt(),
+                reason = StrengthReason.WEAK_COMMON_ROOT
+            )
         }
 
         // Split by Unicode code points (matching JS `Array.from(m)`).
@@ -176,15 +200,19 @@ object CrackResistanceEstimator {
             bits += 3.0
         }
 
-        val rounded = bits.roundToInt()
-        if (mode == Spv2Mode.PIN && Spv2Spec.clampLength(length) <= 8) {
-            return if (bits < 44.0) {
-                StrengthEstimate(level = 1, bits = rounded, reason = StrengthReason.WEAK_SHORT_FOR_PIN)
+        if (mode == Spv2Mode.PIN) {
+            // A PIN is protected by the verifier's attempt limit, so the level stays at "medium"
+            // at best, but the number of bits must reflect the real output space.
+            val shown = minOf(bits, outBits).roundToInt()
+            return if (bits < 44.0 || outBits <= 0.0) {
+                StrengthEstimate(level = 1, bits = shown, reason = StrengthReason.WEAK_SHORT_FOR_PIN)
             } else {
-                StrengthEstimate(level = 2, bits = rounded, reason = StrengthReason.PIN_TERMINAL_LIMITED)
+                StrengthEstimate(level = 2, bits = shown, reason = StrengthReason.PIN_TERMINAL_LIMITED)
             }
         }
 
+        bits = minOf(bits, outBits)
+        val rounded = bits.roundToInt()
         return when {
             bits < 44.0 -> StrengthEstimate(level = 1, bits = rounded, reason = StrengthReason.WEAK_SHORT)
             bits < 64.0 -> StrengthEstimate(level = 2, bits = rounded, reason = StrengthReason.MEDIUM)

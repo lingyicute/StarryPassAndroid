@@ -10,7 +10,6 @@ import io.github.lingyicute.starrypass.crypto.DeriveRequest
 import io.github.lingyicute.starrypass.crypto.DeriveResult
 import io.github.lingyicute.starrypass.crypto.Spv2ErrorCode
 import io.github.lingyicute.starrypass.crypto.Spv2Exception
-import io.github.lingyicute.starrypass.crypto.Spv2Mode
 import io.github.lingyicute.starrypass.crypto.Spv2Spec
 import io.github.lingyicute.starrypass.crypto.StrengthEstimate
 import io.github.lingyicute.starrypass.crypto.StrengthReason
@@ -57,15 +56,13 @@ internal class GeneratorDerivationCoordinator(
             a.counter == b.counter &&
             a.tier == b.tier
 
-    private fun isShortPin(s: GeneratorUiState): Boolean =
-        s.mode == Spv2Mode.PIN && Spv2Spec.clampLength(s.length) <= 8
-
     private fun sameStrengthInputs(a: GeneratorUiState, b: GeneratorUiState): Boolean =
         canonicalMaster(a.master) == canonicalMaster(b.master) &&
             canonicalCode(a.code) == canonicalCode(b.code) &&
             a.tier == b.tier &&
             a.mode == b.mode &&
-            isShortPin(a) == isShortPin(b)
+            // The output space bounds the verdict, so every length change can alter the estimate.
+            Spv2Spec.clampLength(a.length) == Spv2Spec.clampLength(b.length)
 
     fun updateInputs(debounceMs: Long, change: (GeneratorUiState) -> GeneratorUiState) {
         val current = state.value

@@ -162,7 +162,7 @@ class GeneratorDerivationCoordinatorTest {
     }
 
     @Test
-    fun `strength estimate is reused when only counter or irrelevant length changes`() = runTest {
+    fun `strength estimate is reused when only the counter changes`() = runTest {
         val state = MutableStateFlow(GeneratorUiState(master = "Tr0ub4dor&3-xyz!Qw", code = "site"))
         val coordinator = GeneratorDerivationCoordinator(
             scope = this,
@@ -177,8 +177,6 @@ class GeneratorDerivationCoordinatorTest {
 
         coordinator.updateInputs(0) { it.copy(counter = 2) }
         assertSame(first, state.value.strength)
-        coordinator.updateInputs(0) { it.copy(length = 20) }
-        assertSame(first, state.value.strength)
 
         coordinator.updateInputs(0) { it.copy(master = "Tr0ub4dor&3-xyz!Qw?") }
         assertNotSame(first, state.value.strength)
@@ -186,7 +184,27 @@ class GeneratorDerivationCoordinatorTest {
     }
 
     @Test
-    fun `strength estimate is recomputed when a PIN crosses the short-length boundary`() = runTest {
+    fun `strength estimate follows the output length because it bounds the verdict`() = runTest {
+        val state = MutableStateFlow(GeneratorUiState(master = "Tr0ub4dor&3-xyz!Qw", code = "site"))
+        val coordinator = GeneratorDerivationCoordinator(
+            scope = this,
+            state = state,
+            derive = { DeriveResult("derived", false, 1) },
+            isSelfTestVerified = { true }
+        )
+
+        coordinator.updateInputs(0) { it.copy(length = 4) }
+        assertEquals(StrengthReason.WEAK_SHORT, state.value.strength.reason)
+        assertEquals(25, state.value.strength.bits)
+
+        coordinator.updateInputs(0) { it.copy(length = 20) }
+        assertEquals(StrengthReason.VERY_STRONG, state.value.strength.reason)
+        assertEquals(94, state.value.strength.bits)
+        runCurrent()
+    }
+
+    @Test
+    fun `strength estimate of a PIN reflects its output space at every length`() = runTest {
         val state = MutableStateFlow(
             GeneratorUiState(master = "Tr0ub4dor&3-xyz!Qw", code = "site", mode = Spv2Mode.PIN, length = 6)
         )
@@ -198,12 +216,16 @@ class GeneratorDerivationCoordinatorTest {
         )
 
         coordinator.updateInputs(0) { it.copy(counter = 2) }
-        val shortPin = state.value.strength
-        coordinator.updateInputs(0) { it.copy(length = 8) }
-        assertSame(shortPin, state.value.strength)
+        val sixDigits = state.value.strength
+        assertEquals(StrengthReason.PIN_TERMINAL_LIMITED, sixDigits.reason)
+        assertEquals(20, sixDigits.bits)
+
+        coordinator.updateInputs(0) { it.copy(counter = 3) }
+        assertSame(sixDigits, state.value.strength)
 
         coordinator.updateInputs(0) { it.copy(length = 12) }
-        assertNotEquals(shortPin.reason, state.value.strength.reason)
+        assertEquals(StrengthReason.PIN_TERMINAL_LIMITED, state.value.strength.reason)
+        assertEquals(40, state.value.strength.bits)
         runCurrent()
     }
 }
