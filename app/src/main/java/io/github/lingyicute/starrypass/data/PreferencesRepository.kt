@@ -169,7 +169,8 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 }
                 if (!policyOnly && codeIdx >= 0 && codeIdx != idx) current.removeAt(codeIdx)
             } else {
-                current.add(0, normalized)
+                val entry = if (idIdx >= 0) normalized.copy(id = UUID.randomUUID().toString()) else normalized
+                current.add(0, entry)
             }
             prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
         }
