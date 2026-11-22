@@ -28,6 +28,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.net.IDN
 import java.text.Normalizer
@@ -56,10 +57,23 @@ private fun Context.starryPassDataStore(): DataStore<Preferences> {
     }
 }
 
-private fun backupCorruptedFile(file: File) {
-    runCatching {
-        if (file.exists()) file.copyTo(File(file.parentFile, file.name + ".corrupt"), overwrite = true)
+internal fun backupCorruptedFile(file: File): File? {
+    if (!file.exists()) return null
+    // Never overwrite an earlier recovery copy. If backup fails, propagate IOException so
+    // DataStore cannot replace the only remaining copy with empty preferences.
+    val backup = File.createTempFile(file.name + ".corrupt-", ".bak", file.parentFile)
+    try {
+        file.inputStream().use { source ->
+            FileOutputStream(backup).use { destination ->
+                source.copyTo(destination)
+                destination.fd.sync()
+            }
+        }
+    } catch (failure: IOException) {
+        backup.delete()
+        throw failure
     }
+    return backup
 }
 
 class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
