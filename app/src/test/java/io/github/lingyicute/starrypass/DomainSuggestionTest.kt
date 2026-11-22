@@ -365,4 +365,13 @@ class DomainSuggestionTest {
             )
         }
     }
+
+    @Test
+    fun `cookie-style prefix cannot expose an unvalidated bracket host`() {
+        for (raw in listOf(".[", "*.[example]", ".[abc]:80", "..[0")) {
+            assertEquals(raw, "", PreferencesRepository.normalizeDomain(raw))
+        }
+        assertEquals("[::1]", PreferencesRepository.normalizeDomain("[::1]:8080"))
+        assertEquals("[2001:db8::1]", PreferencesRepository.normalizeDomain("http://[2001:db8::1]/x"))
+    }
 }

@@ -523,9 +523,12 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
                 }
             }
             // Cookie-style entries (`.example.com`, `*.example.com`) already match by suffix.
+            val bracketValidated = s.startsWith("[")
             while (s.startsWith(".") || s.startsWith("*.")) {
                 s = s.removePrefix("*.").trimStart('.')
             }
+            // A bracket exposed only by stripping the prefix never went through the IPv6 check above.
+            if (s.startsWith("[") && !bracketValidated) return ""
             if (s == "www." || s.startsWith("www..")) return ""
             s = s.trimEnd('.')
             if (s.isEmpty() || s == "*" || (!s.startsWith("[") && s.contains(".."))) return ""
