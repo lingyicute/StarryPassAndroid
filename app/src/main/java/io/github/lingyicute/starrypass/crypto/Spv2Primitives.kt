@@ -1,5 +1,5 @@
 /*
- * StarryPass Android — Audited Cryptographic Primitives Wrapper
+ * StarryPass Android — Standard Cryptographic Primitives Wrapper
  * Copyright (C) 2024-2026 lingyicute
  * Licensed under GNU AGPL-3.0-or-later.
  *
@@ -8,8 +8,8 @@
  *   - HMAC-SHA-256 ..... Platform JCA Mac ("HmacSHA256", BoringSSL/Conscrypt on Android)
  *   - Constant-time == . Platform JCA MessageDigest.isEqual
  *   - CSPRNG ........... Platform JCA SecureRandom (BoringSSL / Linux getrandom)
- *   - HKDF-SHA-256 ..... Bouncy Castle HKDFBytesGenerator (RFC 5869, NCC Group audited)
- *   - Argon2id v1.3 .... Bouncy Castle Argon2BytesGenerator (RFC 9106, NCC Group audited)
+ *   - HKDF-SHA-256 ..... Bouncy Castle HKDFBytesGenerator (RFC 5869)
+ *   - Argon2id v1.3 .... Bouncy Castle Argon2BytesGenerator (RFC 9106)
  */
 package io.github.lingyicute.starrypass.crypto
 
@@ -61,7 +61,7 @@ internal object Spv2Primitives {
     }
 
     /**
-     * Argon2id v1.3 (RFC 9106) via Bouncy Castle's audited [Argon2BytesGenerator].
+     * Argon2id v1.3 (RFC 9106) via Bouncy Castle's [Argon2BytesGenerator].
      * Supports both `secret` (RFC 9106 `K`, used in §5.3 KAT) and `ad` (RFC 9106 `X`,
      * used for StarryPass domain separation `"StarryPass-v2:argon2id-ad:v1"`).
      */

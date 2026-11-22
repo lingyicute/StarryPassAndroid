@@ -3,13 +3,13 @@
 
     <!--
         INTENTIONALLY ZERO NETWORK PERMISSIONS (No android.permission.INTERNET).
-        Linux kernel (AID_INET) guarantees StarryPass can never transmit data off-device.
+        This restricts direct network sockets, not IPC or sharing with other apps.
     -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!--
-        android:largeHeap="true" ensures >=512 MiB ART heap headroom so the
-        "paranoid" tier (256 MiB Argon2id v1.3 memory matrix) runs reliably on mobile devices.
+        android:largeHeap="true" requests additional heap headroom; Android guarantees no
+        minimum size. The 256 MiB tier may still fail and must never silently downgrade.
     -->
     <application
         android:name=".StarryPassApp"

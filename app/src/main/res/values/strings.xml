@@ -63,11 +63,11 @@
 
     <string name="action_copy">Copy Password</string>
     <string name="action_copied">Copied</string>
-    <string name="clipboard_copied_snackbar">Copied to clipboard (sensitive masked)</string>
+    <string name="clipboard_copied_snackbar">Password copied and marked sensitive where supported</string>
     <string name="clipboard_copy_failed">Copy failed</string>
-    <string name="clipboard_countdown_banner">Clipboard auto-clears in %1$ds</string>
+    <string name="clipboard_countdown_banner">Clipboard clear attempt in %1$ds</string>
     <string name="clipboard_clear_now">Wipe Now</string>
-    <string name="clipboard_cleared_toast">Clipboard wiped</string>
+    <string name="clipboard_cleared_toast">This copy is cleared or replaced; unrelated clipboard content was kept</string>
 
     <!-- Strength Labels -->
     <string name="strength_empty">—</string>
@@ -78,8 +78,8 @@
     <string name="strength_pin_limited">PIN · Relies on terminal rate-limit</string>
     <string name="strength_weak_short">Weak · Lengthen master (~%1$d bits)</string>
     <string name="strength_medium">Medium · Use passphrase (~%1$d bits)</string>
-    <string name="strength_strong">Strong · Cluster-resistant (~%1$d bits)</string>
-    <string name="strength_very_strong">Very Strong · Long-term safe (~%1$d bits)</string>
+    <string name="strength_strong">Heuristic: high (~%1$d bits; no guarantee)</string>
+    <string name="strength_very_strong">Heuristic: very high (~%1$d bits; no guarantee)</string>
 
     <!-- Notice & How It Works -->
     <string name="security_notice">StarryPass v2.1 derives passwords locally via RFC 9106 Argon2id + RFC 5869 HKDF with zero network permissions. Remember your master password — it can never be recovered if forgotten.</string>
@@ -161,17 +161,17 @@
     <string name="settings_flag_secure_title">Block Screenshots &amp; Recents Preview</string>
     <string name="settings_flag_secure_desc">Enforces Window FLAG_SECURE against screen capture and task switcher snapshots</string>
     <string name="settings_wipe_bg_title">Auto-Wipe Session on Background</string>
-    <string name="settings_wipe_bg_desc">Zeroizes session key, HMAC tag, and master input whenever the app leaves foreground</string>
-    <string name="settings_clipboard_clear_title">Auto-Clear Clipboard</string>
+    <string name="settings_wipe_bg_desc">After the process enters background, clear UI secrets and cancel work; key wiping waits for any running Argon2 operation</string>
+    <string name="settings_clipboard_clear_title">Best-Effort Clipboard Auto-Clear</string>
     <string name="clipboard_off">Off</string>
     <string name="clipboard_seconds">%1$ds</string>
 
-    <string name="settings_audit_section">Cryptographic Verification &amp; Audit</string>
-    <string name="audit_zero_network_title">Kernel-Enforced Offline Isolation</string>
-    <string name="audit_zero_network_desc">Zero INTERNET permission in AndroidManifest.xml — OS-guaranteed offline execution.</string>
+    <string name="settings_audit_section">Cryptographic Self-Tests</string>
+    <string name="audit_zero_network_title">No Direct Network Permission</string>
+    <string name="audit_zero_network_desc">No INTERNET permission. This blocks direct network sockets, not data shared through other apps, keyboards, clipboard, or autofill.</string>
     <string name="audit_kat_verified">Power-On Self-Test: PASSED (RFC 9106 §5.3 + RFC 5869 TC1)</string>
     <string name="audit_kat_pending">Power-On Self-Test: Initializing…</string>
-    <string name="audit_primitives_desc" formatted="false">Argon2id v1.3 &amp; HKDF-SHA-256 powered by Bouncy Castle 1.86; SHA-256, HMAC-SHA-256 &amp; CSPRNG powered by Android BoringSSL/Conscrypt. 100% bit-compatible with StarryPass v2 / v2.1.</string>
+    <string name="audit_primitives_desc" formatted="false">Argon2id and HKDF use Bouncy Castle 1.86; SHA-256, HMAC and random bytes use platform JCA providers. This application is not FIPS certified; self-tests and compatibility vectors are not a security audit.</string>
     <string name="audit_license_footer">StarryPass v2.1 Android · GNU AGPLv3 · Copyright © 2024-2026 lingyicute</string>
 
     <!-- Autofill UI -->

@@ -63,11 +63,11 @@
 
     <string name="action_copy">复制密码</string>
     <string name="action_copied">已复制</string>
-    <string name="clipboard_copied_snackbar">密码已复制到剪贴板（已启用敏感内容遮罩）</string>
+    <string name="clipboard_copied_snackbar">密码已复制，并在系统支持时标记为敏感内容</string>
     <string name="clipboard_copy_failed">复制失败，请重试</string>
-    <string name="clipboard_countdown_banner">剪贴板将在 %1$d 秒后自动清空</string>
+    <string name="clipboard_countdown_banner">将在 %1$d 秒后尝试清理本次密码复制</string>
     <string name="clipboard_clear_now">立即清空</string>
-    <string name="clipboard_cleared_toast">剪贴板已安全清空</string>
+    <string name="clipboard_cleared_toast">本次复制已清理或被替换，其他剪贴板内容保持不变</string>
 
     <!-- Strength Labels -->
     <string name="strength_empty">—</string>
@@ -78,8 +78,8 @@
     <string name="strength_pin_limited">PIN · 依赖终端限次</string>
     <string name="strength_weak_short">弱 · 建议加长主密码（约 %1$d bits）</string>
     <string name="strength_medium">中 · 建议用长句口令（约 %1$d bits）</string>
-    <string name="strength_strong">强 · 抗集群暴力破解（约 %1$d bits）</string>
-    <string name="strength_very_strong">极强 · 长期防破解（约 %1$d bits）</string>
+    <string name="strength_strong">启发式估算：较高（约 %1$d bits，不构成安全保证）</string>
+    <string name="strength_very_strong">启发式估算：很高（约 %1$d bits，不构成安全保证）</string>
 
     <!-- Notice & How It Works -->
     <string name="security_notice">v2.1 使用 Argon2id（RFC 9106）内存硬化派生与 HKDF-SHA-256，本应用零网络权限、全程离线计算，不上传任何数据。请牢记主密码；忘记后无法找回。</string>
@@ -161,17 +161,17 @@
     <string name="settings_flag_secure_title">禁止截屏与后台预览模糊</string>
     <string name="settings_flag_secure_desc">启用 Window FLAG_SECURE，防止恶意录屏及多任务卡片泄露密码</string>
     <string name="settings_wipe_bg_title">切入后台自动抹除内存</string>
-    <string name="settings_wipe_bg_desc">离开前台时立即清零会话密钥、HMAC 标签与已输入的主密码</string>
-    <string name="settings_clipboard_clear_title">剪贴板定时自动清空</string>
+    <string name="settings_wipe_bg_desc">进程进入后台后清除界面秘密并取消任务；会话密钥清理须等待正在运行的 Argon2 结束</string>
+    <string name="settings_clipboard_clear_title">尽力定时清理本次剪贴板复制</string>
     <string name="clipboard_off">关闭</string>
     <string name="clipboard_seconds">%1$d 秒</string>
 
-    <string name="settings_audit_section">密码学自检与合规审计</string>
-    <string name="audit_zero_network_title">内核级零网络权限隔离</string>
-    <string name="audit_zero_network_desc">AndroidManifest 未声明 INTERNET 权限，由系统内核强制保证绝不联网。</string>
+    <string name="settings_audit_section">密码学自检</string>
+    <string name="audit_zero_network_title">无直接联网权限</string>
+    <string name="audit_zero_network_desc">未声明 INTERNET 权限，阻止直接网络套接字访问；不阻止通过其他应用、输入法、剪贴板或自动填充分享数据。</string>
     <string name="audit_kat_verified">开机密码学自检：已通过（RFC 9106 §5.3 + RFC 5869 TC1）</string>
     <string name="audit_kat_pending">开机密码学自检：正在校验…</string>
-    <string name="audit_primitives_desc">Argon2id v1.3 与 HKDF-SHA-256 由经审计的 Bouncy Castle 1.86 提供；SHA-256、HMAC-SHA-256 与真随机数由 Android 系统 BoringSSL / Conscrypt 提供。与网页版 StarryPass v2 / v2.1 逐位兼容。</string>
+    <string name="audit_primitives_desc">Argon2id 与 HKDF 使用 Bouncy Castle 1.86；SHA-256、HMAC 与随机数使用平台 JCA 提供者。本应用未经 FIPS 认证；自检和兼容性向量不等同于安全审计。</string>
     <string name="audit_license_footer">星愿令 · StarryPass v2.1 Android · GNU AGPLv3 · Copyright © 2024-2026 lingyicute</string>
 
     <!-- Autofill UI -->
