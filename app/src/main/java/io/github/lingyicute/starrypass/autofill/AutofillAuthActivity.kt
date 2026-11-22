@@ -125,6 +125,7 @@ import io.github.lingyicute.starrypass.ui.tierShortLabelText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -302,10 +303,14 @@ class AutofillAuthActivity : FragmentActivity() {
                             return@launch
                         }
                         if (copyOnly) {
+                            val clearSeconds = app.preferencesRepository.settingsFlow.first().clipboardAutoClearSeconds
+                            if (seq != deriveSeq || !app.sessionWipes.isCurrent(generation) || isFinishing || isDestroyed) {
+                                return@launch
+                            }
                             val copied = app.clipboardManager.copySensitivePassword(
                                 label = getString(R.string.app_name),
                                 secret = res.password,
-                                autoClearSeconds = settings.clipboardAutoClearSeconds
+                                autoClearSeconds = clearSeconds
                             )
                             if (copied) {
                                 master = ""
