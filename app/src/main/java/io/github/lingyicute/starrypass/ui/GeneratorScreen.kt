@@ -145,6 +145,9 @@ fun GeneratorScreen(
     var justCopied by remember { mutableStateOf(false) }
     var copyFeedbackKey by remember { mutableIntStateOf(0) }
     var counterText by remember(uiState.counter) { mutableStateOf(uiState.counter.toString()) }
+    // While the field shows an empty or out-of-range entry, the output still belongs to the
+    // previous counter; do not let it be copied or saved as if it matched (autofill parity).
+    val counterTextMatches = counterText.toIntOrNull() == uiState.counter
 
     LaunchedEffect(uiState.master.isEmpty()) {
         if (uiState.master.isEmpty()) {
@@ -299,11 +302,14 @@ fun GeneratorScreen(
                             if (uiState.code.isNotEmpty()) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     if (Spv2Spec.ecmaTrim(uiState.code).isNotEmpty()) {
-                                        IconButton(onClick = onSaveCurrentAsPreset) {
+                                        IconButton(
+                                            onClick = onSaveCurrentAsPreset,
+                                            enabled = counterTextMatches
+                                        ) {
                                             Icon(
                                                 imageVector = Icons.Outlined.BookmarkAdd,
                                                 contentDescription = stringResource(R.string.action_save_as_preset),
-                                                tint = colorScheme.primary
+                                                tint = colorScheme.primary.copy(alpha = if (counterTextMatches) 1f else 0.38f)
                                             )
                                         }
                                     }
@@ -518,6 +524,7 @@ fun GeneratorScreen(
                                                     }
                                                 },
                                                 singleLine = true,
+                                                isError = !counterTextMatches,
                                                 shape = RoundedCornerShape(12.dp),
                                                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                                                     textAlign = TextAlign.Center,
@@ -758,7 +765,7 @@ fun GeneratorScreen(
                                         justCopied = onCopyClick()
                                         if (justCopied) copyFeedbackKey++
                                     },
-                                    enabled = pwd != null && !uiState.isDeriving,
+                                    enabled = pwd != null && !uiState.isDeriving && counterTextMatches,
                                     shape = CircleShape,
                                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                                     colors = ButtonDefaults.buttonColors(
