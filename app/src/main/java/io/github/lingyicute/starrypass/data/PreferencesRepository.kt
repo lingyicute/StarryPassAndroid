@@ -475,6 +475,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             }
             if (NON_NETWORK_URI.containsMatchIn(s)) return ""
             val hasAuthorityPrefix = SCHEME_PREFIX.containsMatchIn(s) || s.startsWith("//")
+            if (!hasAuthorityPrefix && (s.startsWith("http:") || s.startsWith("https:"))) return ""
             s = when {
                 SCHEME_PREFIX.containsMatchIn(s) -> s.replaceFirst(SCHEME_PREFIX, "")
                 s.startsWith("//") -> s.removePrefix("//")
