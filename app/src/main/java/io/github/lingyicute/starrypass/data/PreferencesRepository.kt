@@ -76,6 +76,9 @@ internal fun backupCorruptedFile(file: File): File? {
     return backup
 }
 
+private inline fun <reified T> Preferences.readOrNull(key: Preferences.Key<T>): T? =
+    asMap()[key] as? T
+
 class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     constructor(context: Context) : this(context.starryPassDataStore())
@@ -103,18 +106,26 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
 
     val settingsFlow: Flow<AppSettings> = safeData.map { prefs ->
         AppSettings(
-            theme = ThemePreference.fromKey(prefs[Keys.THEME]),
-            dynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true,
-            flagSecure = prefs[Keys.FLAG_SECURE] ?: true,
-            wipeOnBackground = prefs[Keys.WIPE_ON_BACKGROUND] ?: true,
-            clipboardAutoClearSeconds = prefs[Keys.CLIPBOARD_AUTO_CLEAR_SEC] ?: 45,
-            colorizePassword = prefs[Keys.COLORIZE_PASSWORD] ?: true
+            theme = ThemePreference.fromKey(prefs.readOrNull(Keys.THEME)),
+            dynamicColor = prefs.readOrNull(Keys.DYNAMIC_COLOR) ?: true,
+            flagSecure = prefs.readOrNull(Keys.FLAG_SECURE) ?: true,
+            wipeOnBackground = prefs.readOrNull(Keys.WIPE_ON_BACKGROUND) ?: true,
+            clipboardAutoClearSeconds = prefs.readOrNull(Keys.CLIPBOARD_AUTO_CLEAR_SEC)?.takeIf { it >= 0 } ?: 45,
+            colorizePassword = prefs.readOrNull(Keys.COLORIZE_PASSWORD) ?: true
         )
     }.distinctUntilChanged()
 
+    private fun readPresetJson(prefs: Preferences, requireComplete: Boolean = false): String? {
+        val value = prefs.asMap()[Keys.SITE_PRESETS_JSON]
+        if (value != null && value !is String && requireComplete) {
+            throw IOException("Stored presets have an unexpected type; refusing replacement")
+        }
+        return value as? String
+    }
+
     // Unrelated setting changes re-emit the whole snapshot; only re-decode when the JSON changed.
     val presetsFlow: Flow<List<SitePreset>> = safeData
-        .map { prefs -> prefs[Keys.SITE_PRESETS_JSON] }
+        .map { prefs -> readPresetJson(prefs) }
         .distinctUntilChanged()
         .map { raw -> decodePresets(raw).sortedByDescending { it.updatedAtEpochMs } }
 
@@ -165,7 +176,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
             updatedAtEpochMs = System.currentTimeMillis()
         )
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true).toMutableList()
+            val current = decodePresets(readPresetJson(prefs, requireComplete = true), requireComplete = true).toMutableList()
             val idIdx = current.indexOfFirst { it.id == normalized.id }
             val codeIdx = current.indexOfFirst { it.code == normalized.code }
             // Quick policy save always targets the site code; full editor keeps its own entry and replaces on rename.
@@ -196,7 +207,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         if (cleanId.isEmpty()) return PresetRotationResult.NotFound
         var result: PresetRotationResult = PresetRotationResult.NotFound
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true).toMutableList()
+            val current = decodePresets(readPresetJson(prefs, requireComplete = true), requireComplete = true).toMutableList()
             val idx = current.indexOfFirst { it.id == cleanId }
             if (idx >= 0) {
                 val item = current[idx]
@@ -220,7 +231,7 @@ class PreferencesRepository(private val dataStore: DataStore<Preferences>) {
         val cleanId = Spv2Spec.ecmaTrim(presetId)
         if (cleanId.isEmpty()) return
         dataStore.edit { prefs ->
-            val current = decodePresets(prefs[Keys.SITE_PRESETS_JSON], requireComplete = true)
+            val current = decodePresets(readPresetJson(prefs, requireComplete = true), requireComplete = true)
                 .filterNot { it.id == cleanId }
             prefs[Keys.SITE_PRESETS_JSON] = json.encodeToString(current)
         }
