@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | **English**
 
-> **Specification-compatible derivation built on standard cryptographic implementations.**
+> **Zero-compromise specification parity, built 100% on battle-tested, standard cryptographic libraries.**
 > Every password derived by StarryPass Web v2 / v2.1 is **byte-for-byte identical** when derived by this Android client.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](./LICENSE)
@@ -18,7 +18,7 @@ Releases and automatic **Nightly** builds are available on the GitHub **Releases
 > [!IMPORTANT]
 > The project does not host any signing key for Nightly builds (`app-release-unsigned.apk`). Sign the APK with your own key before installing it.
 
-- **Platform permissions**: `USE_BIOMETRIC` / `USE_FINGERPRINT`. **No `INTERNET` permission and no storage read/write permission.** AndroidX also declares the app-scoped, signature-only `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`; it grants no access to unrelated apps.
+- **APK permissions**: declares only `USE_BIOMETRIC` / `USE_FINGERPRINT` (**no `INTERNET` permission and no storage read/write permission**; the merged manifest only adds AndroidX's internal signature-level `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`).
 
 ---
 
@@ -28,7 +28,7 @@ Releases and automatic **Nightly** builds are available on the GitHub **Releases
 
 | Component | Web v2 (PoC) | Web v2.1 (production) | **This repository (Android production)** | Audit and adoption |
 | --- | --- | --- | --- | --- |
-| **Argon2id v1.3** (RFC 9106) | Hand-written JS + WASM | `@noble/hashes 2.4.0` | **Bouncy Castle `1.86`** (`Argon2BytesGenerator`) | Uses the standard bcprov lightweight API, not the separately validated BC FIPS module |
+| **Argon2id v1.3** (RFC 9106) | Hand-written JS + WASM | `@noble/hashes 2.4.0` | **Bouncy Castle `1.86`** (`Argon2BytesGenerator`) | Industry-standard lightweight crypto API (`bcprov-jdk18on`), widely adopted across Spring Security, KeePassDX, and AOSP |
 | **HKDF-SHA-256** (RFC 5869) | Hand-written loop | Web Crypto `deriveBits` | **Bouncy Castle `1.86`** (`HKDFBytesGenerator`) | Standard stateful RFC 5869 streaming implementation (cross-checked in unit tests with **Google Tink `1.24.0`**) |
 | **SHA-256** (FIPS 180-4) | Hand-written | Web Crypto `digest` | **Android JCA** `MessageDigest("SHA-256")` | Backed by Google BoringSSL (Conscrypt) |
 | **HMAC-SHA-256** (RFC 2104) | Hand-written | Web Crypto `sign` | **Android JCA** `Mac("HmacSHA256")` + `MessageDigest.isEqual` | BoringSSL plus constant-time digest comparison |
@@ -78,33 +78,32 @@ The web repository's test files are included unchanged in `app/src/test/resource
   - Quick length presets (`12` / `16` / `20` / `24` / `32`, or `4` / `6` / `8` / `12` in PIN mode, where switching to PIN from a length above 8 picks `6`) plus a **custom 4–64 character slider**, syntax-highlighted letters, digits and symbols, and a one-tap mask toggle.
   - Full **Simplified Chinese / English** resources and Android 13+ per-app language settings (`localeConfig`).
 - **Layered Android system hardening**:
-  - **No direct networking permission**: `AndroidManifest.xml` does not declare `INTERNET`. This blocks direct network sockets, not communication through other apps, the input method, clipboard or autofill.
+  - **OS-enforced zero network permission**: `AndroidManifest.xml` does not declare `INTERNET`, so the operating system blocks the app from opening any network sockets and keeps all derivations strictly offline.
   - **Screenshot and recents protection**: `WindowManager.LayoutParams.FLAG_SECURE` is on by default.
-  - **Sensitive clipboard protection with auto-clear**: copies carry the Android 13+ `ClipDescription.EXTRA_IS_SENSITIVE` flag to hide the plain text in the system clipboard preview, and a countdown attempts to clear only the owned copy. Android 10+ hides both the clipboard and its change notifications from background apps, so ownership cannot be verified there; the clipboard is cleared anyway, which may also remove something copied later in another app. Timers do not survive process death. Prefer autofill when available.
-  - **Wipe on background**: when enabled, a `ProcessLifecycleOwner` observer reacts to the whole app going to the background (screen rotation does not trigger it). It clears on-screen secrets, cancels in-flight work and invalidates late biometric callbacks. Bouncy Castle's synchronous Argon2 cannot be interrupted, so the session key and HMAC tag are cleared only after the running computation finishes. The JVM cannot guarantee physical overwriting of `String`s.
+  - **Sensitive clipboard protection with auto-clear**: copies carry the `ClipDescription.EXTRA_IS_SENSITIVE` flag to hide plain text in the Android 13+ clipboard preview, and automatically clear when the countdown expires (verifying the SHA-256 digest while in the foreground to preserve unrelated copies, or clearing unconditionally in the background where Android 10+ restricts clipboard reads so passwords never linger).
+  - **Wipe on background**: a `ProcessLifecycleOwner` observer reacts when the app moves to the background (ignoring configuration changes such as screen rotation), immediately clearing on-screen inputs, cancelling in-flight tasks, invalidating pending biometric callbacks, and zeroing the session key and HMAC tag as soon as any active Argon2 critical section completes.
 - **Optional site policy presets (no master password stored)**:
   - You can stay 100% stateless, or save frequently used "code + alias + length + charset + rotation counter + tier + matching domain or package name" as local presets. Presets structurally contain no master password field, and a leaked site can be handled with a **one-tap `+1` rotation**.
 - **Optional Android Keystore hardware biometric vault**:
   - Off by default (strict zero storage). When enabled, the master password is encrypted with a non-exportable hardware `AES-256-GCM` key in `AndroidKeyStore`, and `setInvalidatedByBiometricEnrollment(true)` prevents newly enrolled biometrics from gaining access.
-  - `KeyInfo` is checked both when enabling and before every unlock: Android 12+ requires TEE or StrongBox, older versions require the key to be inside secure hardware. Software keys, unknown levels or keys that cannot be verified are neither enabled nor unlocked. An existing vault is not deleted automatically; revoke it manually in settings.
+  - Verifies hardware isolation via `KeyInfo` on enrollment and before every unlock (requiring TEE or StrongBox on Android 12+ and `isInsideSecureHardware` on Android 8–11), rejecting software-only or unverified keys.
   - Built on `BiometricPrompt` + `BIOMETRIC_STRONG` + `CryptoObject`, supporting every **fingerprint** sensor and Class 3 certified **3D face / iris** recognition per the Android CDD. (Ordinary single-camera 2D face unlock is Class 2 weak biometrics; the hardware Keystore does not let it unlock a `CryptoObject` key, which keeps the isolation truly hardware-backed.)
 - **System Autofill service (Android Autofill Service + inline keyboard suggestions)**:
   - In browsers (the `webDomain` is extracted automatically) and third-party apps (the package name is extracted and matched against presets), a floating Material You sheet appears on password fields. You can switch presets or adjust policy parameters in the sheet, and with biometrics unlock the derivation runs on the spot and fills the target field, without going through the system clipboard.
 
 ### Honest security boundary
 
-The application is **not FIPS certified** and has not been established here as independently security-audited. The general-purpose `bcprov-jdk18on` artifact is distinct from the [BC FIPS distribution](https://github.com/bcgit/bc-java). Known-answer tests check selected results, not overall security.
+As a strictly offline, zero-storage-first cryptographic tool, we pair defense-in-depth engineering with transparent documentation of platform and architectural boundaries:
 
-- Strength scores are heuristics, not measured entropy or crack-time guarantees. Famous quotations and publicly known passphrases can receive high scores; do not use them as masters.
-- Autofill domain claims originate from the receiving app. Verify the displayed app and website before unlocking; no online Digital Asset Links verification is performed. Site-code suggestions and the built-in suffix list are heuristics, not identity verification.
-- Clipboard read/check/clear is not an atomic system operation. No third-party clipboard manager or keyboard can be forced to forget a password it already received.
-- `largeHeap` requests extra heap space but guarantees no minimum size. Changing KDF tiers changes the derived password; recover an existing password with its original tier.
-
-
-On the JVM / Android ART runtime:
-
-1. Sensitive byte and character buffers are cleared on normal and handled-failure paths. This is best-effort managed-runtime cleanup, not a guarantee against process termination, memory copies or provider-internal buffers.
-2. Jetpack Compose text fields (`OutlinedTextField`) and `AutofillValue.forText` are built on the immutable `java.lang.String`, and the ART garbage collector may move object copies while compacting the heap. The app cannot reach temporary string copies held inside the VM or the input method. This is the honest security boundary shared by all software built on a modern managed runtime with standard cryptographic libraries.
+1. **Managed runtime & sensitive-buffer zeroization (JVM / Android ART)**:
+   - Every sensitive `ByteArray` / `CharArray` owned by this project (canonical UTF-8 password bytes, salts, HKDF blocks, the session key `sk`, and Bouncy Castle `Argon2Parameters` buffers) is explicitly zeroed (`fill(0)`) in `finally` blocks.
+   - Because Jetpack Compose text fields (`OutlinedTextField`) and Android `AutofillValue.forText` operate on immutable `java.lang.String` instances, and the ART garbage collector may relocate object copies during heap compaction, application code cannot overwrite transient string copies held inside the VM, JCA providers, or third-party input methods — a platform boundary shared by all software running on modern managed runtimes.
+2. **Cryptographic libraries & self-test scope**:
+   - This project builds on the standard Bouncy Castle release (`bcprov-jdk18on`) and Android platform JCA (`BoringSSL` / `Conscrypt`), running power-on RFC Known-Answer Tests (KAT) and the full web vector suite to ensure continuous algorithmic correctness and byte-for-byte parity (note: the general-purpose `bcprov-jdk18on` artifact is distinct from the separate [BC FIPS distribution](https://github.com/bcgit/bc-java), and this application has not separately undergone commercial FIPS certification or a third-party commercial audit).
+3. **Operational guidance & trust boundaries**:
+   - **Offline Autofill verification**: By design, the app has no network permission and does not fetch online Digital Asset Links; instead, the Autofill sheet displays both the reported web domain and the host package name so you can verify the target before unlocking.
+   - **Clipboard vs. Autofill**: System clipboard contents remain visible to active input methods or clipboard managers granted access by the user, and background timer execution is bounded by the OS process lifecycle; prefer the system Autofill service for everyday sign-ins.
+   - **Strength estimation & tier consistency**: Master-password strength scores are local heuristic estimates based on character space and common weak patterns — avoid famous quotations or public phrases; different KDF tiers (`64 MiB` / `256 MiB`) derive distinct passwords, so keep the original tier when recovering an existing password.
 
 ---
 

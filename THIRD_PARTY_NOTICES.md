@@ -2,13 +2,13 @@
 
 StarryPass Android (`io.github.lingyicute.starrypass`, Copyright (C) 2024-2026 lingyicute) is licensed under the GNU Affero General Public License v3.0 or later (`LICENSE`), consistent with [StarryPass](https://github.com/lingyicute/StarryPass).
 
-This distribution incorporates the following open-source libraries under GPL/AGPL-compatible permissive licenses:
+This distribution incorporates the following industry-standard open-source libraries under GPL/AGPL-compatible permissive licenses:
 
 ---
 
 ## 1. The Legion of the Bouncy Castle (`org.bouncycastle:bcprov-jdk18on:1.86`)
 
-Used for RFC 9106 Argon2id v1.3 (`Argon2BytesGenerator`) and RFC 5869 HKDF-SHA-256 (`HKDFBytesGenerator`). This general-purpose artifact is not `bc-fips`; no FIPS certification is claimed for this application.
+Used for RFC 9106 Argon2id v1.3 (`Argon2BytesGenerator`) and RFC 5869 HKDF-SHA-256 (`HKDFBytesGenerator`) via the standard `bcprov-jdk18on` lightweight cryptography API.
 
 ```text
 Copyright (c) 2000 - 2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org)

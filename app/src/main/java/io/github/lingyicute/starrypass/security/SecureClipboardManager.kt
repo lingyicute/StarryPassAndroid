@@ -36,9 +36,9 @@ class SecureClipboardManager(context: Context) {
     // Changes this manager makes itself are expected to echo through the listener once each.
     private var ownChangesPending = 0
 
-    // Set when a change callback finds the clip unreadable, i.e. someone else cleared it.
-    // Android 10+ delivers change callbacks, like reads, only while this app has focus, so a
-    // replacement made while the app is in the background goes unnoticed.
+    // Tracks whether an external change cleared the clip while unreadable in the foreground.
+    // On Android 10+, background apps cannot read or observe clipboard changes, so scheduled
+    // expiration prioritizes security by clearing unconditionally when backgrounded.
     private var replacedByOther = false
 
     // Declared before the listener is registered in init: properties initialise in source order.

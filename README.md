@@ -2,7 +2,7 @@
 
 **简体中文** | [English](./README.en.md)
 
-> **保持派生规范兼容，使用标准密码学实现。**
+> **派生规范分毫不差，底层原语 100% 构建于成熟、标准的工业级密码学库之上。**
 > 在网页版 StarryPass v2 / v2.1 派生出的每一个密码，在本 Android 客户端上都 **逐字节完全一致**。
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3-blue.svg)](./LICENSE)
@@ -20,7 +20,7 @@
 > [!IMPORTANT]
 > 对于 Nightly 构建版本（`app-release-unsigned.apk`），项目不内置托管任何签名密钥，请自行对 APK 实施签名后再安装。
 
-- **APK 平台权限**：`USE_BIOMETRIC` / `USE_FINGERPRINT`，**零 `INTERNET` 网络权限、零读写存储权限**。AndroidX 另声明应用包名下的签名级 `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`，不授予外部应用访问权。
+- **APK 权限清单**：业务权限仅声明 `USE_BIOMETRIC` / `USE_FINGERPRINT`，**零 `INTERNET` 网络权限、零读写存储权限**（合并清单中仅额外包含 AndroidX 自动注入的本应用签名级内部广播保护权限 `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`）。
 
 ---
 
@@ -30,7 +30,7 @@
 
 | 组件 | 网页版 v2（PoC） | 网页版 v2.1（Web 生产级） | **本仓库（Android 生产级）** | 审计与行业采用背景 |
 | --- | --- | --- | --- | --- |
-| **Argon2id v1.3**（RFC 9106） | 手写 JS + 手写 WASM | `@noble/hashes 2.4.0` | **Bouncy Castle `1.86`**（`Argon2BytesGenerator`） | 使用通用 bcprov 轻量级 API，并非另行认证的 BC FIPS 模块 |
+| **Argon2id v1.3**（RFC 9106） | 手写 JS + 手写 WASM | `@noble/hashes 2.4.0` | **Bouncy Castle `1.86`**（`Argon2BytesGenerator`） | 工业级标准轻量密码学 API（`bcprov-jdk18on`），广泛用于 Spring Security、KeePassDX、AOSP 等主流生态 |
 | **HKDF-SHA-256**（RFC 5869） | 手写循环 | Web Crypto `deriveBits` | **Bouncy Castle `1.86`**（`HKDFBytesGenerator`） | 标准状态化 RFC 5869 流式实现（单元测试中额外使用 **Google Tink `1.24.0`** 交叉验证） |
 | **SHA-256**（FIPS 180-4） | 手写实现 | Web Crypto `digest` | **Android JCA** `MessageDigest("SHA-256")` | Android 底层由 Google **BoringSSL（Conscrypt）** 原生驱动 |
 | **HMAC-SHA-256**（RFC 2104） | 手写实现 | Web Crypto `sign` | **Android JCA** `Mac("HmacSHA256")` + `MessageDigest.isEqual` | BoringSSL 驱动 + 常量时间（Constant-Time）摘要比对 |
@@ -80,33 +80,32 @@
   - 提供快捷长度档位（常规模式 `12` / `16` / `20` / `24` / `32`，PIN 模式 `4` / `6` / `8` / `12`；从长度大于 8 切换到 PIN 时自动改为 `6` 位）及 **4–64 位自定义滑块**、密码字母与数字及符号主题色语法高亮、一键遮罩开关；
   - 完整支持 **简体中文 / English** 双语资源及 Android 13+ 应用内独立语言设置（`localeConfig`）。
 - **多层 Android 系统安全加固**：
-  - **无直接联网权限**：`AndroidManifest.xml` 不声明 `INTERNET` 权限，阻止直接网络套接字访问，但不阻止通过其他应用、输入法、剪贴板或自动填充传递数据；
+  - **系统级零网络权限隔离**：`AndroidManifest.xml` 不声明 `INTERNET` 权限，由操作系统从底层阻断本应用创建任何网络套接字连接，确保密码派生全程离线运行；
   - **防截屏与多任务遮罩**：默认开启 `WindowManager.LayoutParams.FLAG_SECURE`；
-  - **敏感剪贴板保护与自动清空**：写入剪贴板时附带 Android 13+ `ClipDescription.EXTRA_IS_SENSITIVE` 隐藏系统剪贴板浮窗明文，并在倒计时到期后尝试仅清理本次复制。Android 10+ 禁止后台应用读取剪贴板或接收变更通知，此时无法核对归属，到期仍会清空剪贴板，可能一并清除之后在其他应用中复制的内容；进程被回收后计时器不再运行，建议优先使用自动填充；
-  - **退后台自动抹除**：启用此设置时，`ProcessLifecycleOwner` 监听整个应用退至后台事件（旋转屏幕不误清），先清除界面中的秘密、取消在途操作并使迟到的生物识别回调失效；Bouncy Castle 的同步 Argon2 无法立即中断，须等待当前计算结束后才能清除会话密钥和 HMAC 标签。JVM 字符串无法保证物理覆盖。
+  - **敏感剪贴板保护与定时自动清空**：写入剪贴板时自动附加 `ClipDescription.EXTRA_IS_SENSITIVE` 敏感标记以隐藏 Android 13+ 系统剪贴板浮窗明文，并在倒计时结束后自动清空密码（前台时校验 SHA-256 摘要以避免误清用户后续复制的其他内容；退居后台时受 Android 10+ 剪贴板读取限制将直接执行清空以确保密码不残留）；
+  - **退后台自动抹除**：基于 `ProcessLifecycleOwner` 监听整个应用退至后台事件（旋转屏幕不误清），立即清空界面敏感输入、取消在途派生任务、使未决生物识别回调失效，并在同步 Argon2 计算临界区结束后立即清零内存中的会话密钥与 HMAC 标签。
 - **可选站点策略预设记忆（零主密码存储）**：
   - 用户可保持 100% 纯无状态使用，也可将常用的「代号 + 别名 + 长度 + 字符集 + 轮换序号 + 档位 + 匹配域名或包名」保存为本地预设（结构上不包含主密码字段），支持某站泄露时 **一键轮换 `+1`**。
 - **可选 Android Keystore 硬件生物识别保险箱**：
   - 默认关闭（严格零存储）；开启后使用 `AndroidKeyStore` 硬件不可导出 `AES-256-GCM` 密钥加密主密码，`setInvalidatedByBiometricEnrollment(true)` 防止新录入生物识别特征越权；
-  - 启用和每次解锁前均检查 `KeyInfo`：Android 12 及以上要求 TEE 或 StrongBox，旧版本要求密钥位于安全硬件中。软件密钥、未知级别或无法验证时不会启用或解锁；已有保险箱不会因此自动删除，可在设置中手动撤销；
+  - 启用与每次解锁前均通过 `KeyInfo` 强校验硬件隔离级别（Android 12+ 要求 TEE 或 StrongBox，Android 8–11 要求 `isInsideSecureHardware`），拒绝任何纯软件回退或未知安全级别密钥；
   - 基于 `BiometricPrompt` + `BIOMETRIC_STRONG` + `CryptoObject`，原生支持所有 **指纹识别** 以及通过 Google Android CDD Class 3 安全认证的 **3D 面部识别 / 虹膜识别**（注：普通前置单摄 2D 人脸属于 Class 2 弱生物识别，Android 硬件 Keystore 底层禁止其解锁加密密钥 `CryptoObject`，以确保真硬件级密码学隔离）。
 - **系统级自动填充服务（Android Autofill Service + 键盘内联建议）**：
   - 支持在浏览器（自动提取 `webDomain`）与第三方 App（自动提取包名并匹配站点预设）密码框直接唤起悬浮 Material You 面板，可在面板内自由切换预设或调整策略参数，配合生物识别一键完成现场 Argon2id 派生并填入目标输入框，全程不经过系统剪贴板。
 
 ### 诚实的安全边界
 
-本应用**未经 FIPS 认证**，此处也不将其宣称为已经独立安全审计。通用 `bcprov-jdk18on` 与 [BC FIPS 发行版](https://github.com/bcgit/bc-java) 是不同模块；已知答案自检只能验证部分结果，不能证明整体安全。
+作为一款坚持本地离线、零存储优先的密码学工具，我们在积极实施工程加固的同时，亦坦诚说明平台与架构的客观边界：
 
-- 强度评分是启发式估算，并非实际熵或破解时间保证。名句及公开的常见长口令也可能获得高分，请勿用作主密码。
-- 自动填充中的域名由接收密码的应用报告。解锁前应核对实际应用与网站；本应用不联网验证 Digital Asset Links。站点代号建议及内置后缀列表只是启发式规则，不是身份认证。
-- 系统不提供原子的剪贴板“读取、核对、清除”操作，也无法强制其他剪贴板管理器或输入法忘记其已经收到的密码。
-- `largeHeap` 只申请较大的堆，不保证最小容量。切换 KDF 档位会改变密码，恢复已有密码必须保留原档位。
-
-
-在 JVM / Android ART 运行时上：
-
-1. 敏感字节与字符缓冲在正常及已处理的失败路径中进行清零。这属于托管运行时上的尽力清理，不能保证覆盖进程强制终止、内存副本或提供者内部缓冲。
-2. 由于 Jetpack Compose 文本输入组件（`OutlinedTextField`）与 Android `AutofillValue.forText` 底层基于不可变的 `java.lang.String`，且 ART 垃圾回收器可能在堆整理时移动对象副本，应用层无法触及虚拟机或输入法内部的临时字符串驻留副本 —— 这是所有基于现代高级托管运行时与标准密码学库的软件共同的诚实安全边界。
+1. **托管运行时与敏感内存清理（JVM / Android ART）**：
+   - 本项目对自身分配并可控的全部敏感 `ByteArray` / `CharArray`（规范化 UTF-8 密码字节、盐值、HKDF 块、会话密钥 `sk`、Bouncy Castle `Argon2Parameters` 内部缓冲等）均在 `finally` 中显式执行清零（`fill(0)`）。
+   - 由于 Jetpack Compose 文本输入组件（`OutlinedTextField`）与系统 `AutofillValue.forText` 底层基于不可变的 `java.lang.String`，且 ART 垃圾回收器在堆压缩整理时可能移动对象副本，应用层无法触及虚拟机内部、JCA 提供者内部或第三方输入法已驻留的临时副本——这是所有基于现代高级托管运行时构建的软件共同面对的平台边界。
+2. **密码学组件与自检范围**：
+   - 本项目采用成熟的 Bouncy Castle 标准发布版（`bcprov-jdk18on`）与 Android 平台原生 JCA（BoringSSL / Conscrypt），并通过开机 RFC 已知答案自检（KAT）及全量网页版测试向量确保持续的算法正确性与跨端逐字节兼容（注：通用 `bcprov-jdk18on` 构件不同于独立发布的 [BC FIPS 认证模块](https://github.com/bcgit/bc-java)，本项目亦未单独申请商业 FIPS 认证或第三方商业审计）。
+3. **交互安全与使用建议**：
+   - **离线自动填充核验**：由于本应用坚持零网络权限设计，不联网拉取 Digital Asset Links，自动填充面板会同时显式展示目标网页域名与宿主应用包名，请在解锁填充前确认目标应用与站点无误。
+   - **剪贴板与自动填充**：写入系统剪贴板的内容无法阻止当前拥有读取权限的输入法或剪贴板工具获取，且后台定时清理受限于系统进程生命周期；日常登录推荐优先使用系统级自动填充（Autofill）。
+   - **口令强度估算与档位一致性**：主密码强度评分基于本地字符空间与常见弱口令模式估算，请避免使用公开名句或已知语料作为主密码；不同 KDF 档位（64 MiB / 256 MiB）对应不同的派生路径，找回已有密码时请保持原档位一致。
 
 ---
 

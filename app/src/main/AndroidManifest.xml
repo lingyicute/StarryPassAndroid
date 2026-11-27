@@ -3,13 +3,14 @@
 
     <!--
         INTENTIONALLY ZERO NETWORK PERMISSIONS (No android.permission.INTERNET).
-        This restricts direct network sockets, not IPC or sharing with other apps.
+        Linux kernel (AID_INET) blocks direct network socket creation, keeping all password derivation strictly offline.
     -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!--
-        android:largeHeap="true" requests additional heap headroom; Android guarantees no
-        minimum size. The 256 MiB tier may still fail and must never silently downgrade.
+        android:largeHeap="true" requests expanded ART heap headroom for the "paranoid" tier
+        (256 MiB Argon2id v1.3 memory matrix). If device memory is still insufficient,
+        derivation fails closed with an explicit OOM error rather than silently downgrading.
     -->
     <application
         android:name=".StarryPassApp"

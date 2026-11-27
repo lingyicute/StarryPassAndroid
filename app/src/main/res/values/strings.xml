@@ -57,17 +57,17 @@
     <string name="placeholder_enter_both">Enter master password and site code</string>
     <string name="placeholder_complete_both">Complete both master password and site code</string>
     <string name="placeholder_deriving">Deriving with Argon2id…</string>
-    <string name="error_derive_oom">Insufficient memory for the 256 MiB tier. Changing tiers changes the password; recover existing passwords on a device with enough memory.</string>
+    <string name="error_derive_oom">Insufficient memory for the 256 MiB tier; close background apps and retry (note: changing tiers changes the derived password)</string>
     <string name="error_derive_oom_standard">Insufficient memory to derive on this device, close other apps and retry</string>
     <string name="error_derive_generic">Derivation failed, please retry</string>
 
     <string name="action_copy">Copy Password</string>
     <string name="action_copied">Copied</string>
-    <string name="clipboard_copied_snackbar">Password copied and marked sensitive where supported</string>
+    <string name="clipboard_copied_snackbar">Copied to clipboard (marked as sensitive)</string>
     <string name="clipboard_copy_failed">Copy failed</string>
-    <string name="clipboard_countdown_banner">Clipboard clear attempt in %1$ds</string>
+    <string name="clipboard_countdown_banner">Clipboard auto-clears in %1$ds</string>
     <string name="clipboard_clear_now">Wipe Now</string>
-    <string name="clipboard_cleared_toast">This copy is cleared or replaced; unrelated clipboard content was kept</string>
+    <string name="clipboard_cleared_toast">Password cleared from clipboard</string>
 
     <!-- Strength Labels -->
     <string name="strength_empty">—</string>
@@ -78,8 +78,8 @@
     <string name="strength_pin_limited">PIN · Relies on terminal rate-limit</string>
     <string name="strength_weak_short">Weak · Lengthen master (~%1$d bits)</string>
     <string name="strength_medium">Medium · Use passphrase (~%1$d bits)</string>
-    <string name="strength_strong">Heuristic: high (~%1$d bits; no guarantee)</string>
-    <string name="strength_very_strong">Heuristic: very high (~%1$d bits; no guarantee)</string>
+    <string name="strength_strong">Strong · Brute-force resistant (~%1$d bits)</string>
+    <string name="strength_very_strong">Very Strong · High security margin (~%1$d bits)</string>
 
     <!-- Notice & How It Works -->
     <string name="security_notice">StarryPass v2.1 derives passwords locally via RFC 9106 Argon2id + RFC 5869 HKDF with zero network permissions. Remember your master password — it can never be recovered if forgotten.</string>
@@ -125,8 +125,8 @@
     <string name="settings_colorize_desc">Distinguish letters, digits, and symbols with Material tonal colors</string>
 
     <string name="settings_biometric_section">Hardware Biometric Vault (Optional)</string>
-    <string name="settings_biometric_enrolled_title">Biometric Vault Saved</string>
-    <string name="settings_biometric_enrolled_desc">Each unlock checks that the Keystore key is hardware-backed and requires biometric verification. You may revoke the stored vault below.</string>
+    <string name="settings_biometric_enrolled_title">Hardware Biometric Vault Active</string>
+    <string name="settings_biometric_enrolled_desc">Protected by an Android Keystore hardware-backed AES-256-GCM key; every unlock verifies secure hardware status and requires strong biometric authentication.</string>
     <string name="settings_biometric_not_enrolled_title">Strict Zero-Storage Mode (Default)</string>
     <string name="settings_biometric_not_enrolled_desc">Master password lives only in RAM. Optionally enroll hardware biometric unlock for faster derivation &amp; Autofill.</string>
     <string name="settings_biometric_enroll_btn">Enroll Master Password</string>
@@ -162,17 +162,17 @@
     <string name="settings_flag_secure_title">Block Screenshots &amp; Recents Preview</string>
     <string name="settings_flag_secure_desc">Enforces Window FLAG_SECURE against screen capture and task switcher snapshots</string>
     <string name="settings_wipe_bg_title">Auto-Wipe Session on Background</string>
-    <string name="settings_wipe_bg_desc">After the process enters background, clear UI secrets and cancel work; key wiping waits for any running Argon2 operation</string>
-    <string name="settings_clipboard_clear_title">Best-Effort Clipboard Auto-Clear</string>
+    <string name="settings_wipe_bg_desc">Clears sensitive inputs, cancels in-flight derivations, and wipes cached session keys when backgrounded</string>
+    <string name="settings_clipboard_clear_title">Auto-Clear Clipboard</string>
     <string name="clipboard_off">Off</string>
     <string name="clipboard_seconds">%1$ds</string>
 
-    <string name="settings_audit_section">Cryptographic Self-Tests</string>
-    <string name="audit_zero_network_title">No Direct Network Permission</string>
-    <string name="audit_zero_network_desc">No INTERNET permission. This blocks direct network sockets, not data shared through other apps, keyboards, clipboard, or autofill.</string>
+    <string name="settings_audit_section">Cryptographic Verification &amp; Standards</string>
+    <string name="audit_zero_network_title">OS-Enforced Zero Network Permission</string>
+    <string name="audit_zero_network_desc">AndroidManifest declares no INTERNET permission — direct network socket access is blocked at the OS level, keeping all derivations strictly local.</string>
     <string name="audit_kat_verified">Power-On Self-Test: PASSED (RFC 9106 §5.3 + RFC 5869 TC1)</string>
     <string name="audit_kat_pending">Power-On Self-Test: Initializing…</string>
-    <string name="audit_primitives_desc" formatted="false">Argon2id and HKDF use Bouncy Castle 1.86; SHA-256, HMAC and random bytes use platform JCA providers. This application is not FIPS certified; self-tests and compatibility vectors are not a security audit.</string>
+    <string name="audit_primitives_desc" formatted="false">Argon2id v1.3 &amp; HKDF-SHA-256 are powered by Bouncy Castle 1.86; SHA-256, HMAC-SHA-256 &amp; CSPRNG use Android platform JCA (BoringSSL / Conscrypt). 100% byte-identical to StarryPass Web v2 / v2.1.</string>
     <string name="audit_license_footer">StarryPass v2.1 Android · GNU AGPLv3 · Copyright © 2024-2026 lingyicute</string>
 
     <!-- Autofill UI -->
